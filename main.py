@@ -61,7 +61,17 @@ def all_pairs_lines(shape):
 # does frac[0]/frac[1] intersect [0, n]?
 def rational_intersection(frac, n):
     a, b = frac
+    assert b > 0
     return (b != 0) and (a * b >= 0) and (a <= b*n)
+
+
+def normalize(frac):
+    a, b = frac
+    assert b != 0
+    if b < 0:
+        a, b = -a, -b
+    g = np.gcd(a, b)
+    return a // g, b // g
 
 
 # returns the intersection of line and big box boundary,
@@ -74,30 +84,42 @@ def line_box_intersect(shape, line):
     ps = []
     # case x = 0
     if b !=0:
-        frac = (-c, b)
+        frac = normalize((-c, b))
         if rational_intersection(frac, m):
             ps.append(((0, 1), frac))
     # case x = n
     if b!=0:
-        frac = (-c - a*n, b)
+        frac = normalize((-c - a*n, b))
         if rational_intersection(frac, m):
             ps.append(((n, 1), frac))
     # case y = 0
     if a!=0:
-        frac = (-c, a)
+        frac = normalize((-c, a))
         if rational_intersection(frac, n):
             ps.append((frac, (0, 1)))
+    # case y = m
     if a!=0:
-        frac = (-c - b*m, a)
+        frac = normalize((-c - b*m, a))
         if rational_intersection(frac, n):
             ps.append((frac, (m, 1)))
     return ps
+
+def test_line_box_intersect():
+    shape = 10, 15
+    line = 1, -1, 0
+    print(line_box_intersect(shape, line))
+    line = -1, 1, 10
+    print(line_box_intersect(shape, line))
+
+
+# test_line_box_intersect() ; exit()
 
 
 def test_all_pairs():
     shape = 11, 11
     n, m = shape
     lines = np.array(list(all_pairs_lines((n, m))))
+    print("%d lines collected" % len(lines))
     points = set()
     for line in lines:
         ps = line_box_intersect(shape, line)
@@ -108,6 +130,20 @@ def test_all_pairs():
 
 
 # test_all_pairs() ; exit()
+
+
+def collect_boundary_points(shape):
+    n, m = shape
+    print("shape %d, %d" % (n, m))
+    lines = np.array(list(all_pairs_lines((n, m))))
+    print("%d lines collected" % len(lines))
+    points = set()
+    for line in lines:
+        ps = line_box_intersect(shape, line)
+        points |= set(ps)
+    # seems like number of different boundary points is approximately n^3.
+    print("%d boundary points collected" % len(points))
+    return points
 
 
 def slow_slices(line, shape):
@@ -295,16 +331,62 @@ def build_set_system(shape, samples, patience):
     return collected_slices, ss, cost
 
 
-shape = 100, 100
+shape = 50, 50
+
 n, m = shape
 samples = 20000
 patience = 10000
-maxiters = 2
+maxiters = 2 # unlike the upper bound which needs luck, the lower bound normally converges after maxiters=2.
 collected_slices, ss, cost = build_set_system((n, m), samples=samples, patience=patience)
 print(collected_slices.shape, ss.shape, cost.shape)
 
+
+# interpolates between a quadratic polynomial and a rotationally symmetric formula.
+def create_lagrangian(shape, weight):
+    g = mygrid((n-1, m-1)).astype(float) # reusing a code for cells that was created for crossings. (as in chess vs go)
+    x = g[:, :, 0] / (n-1) * 2 - 1
+    y = g[:, :, 1] / (m-1) * 2 - 1
+    dist = np.sqrt(x * x + y * y)
+    s2 = 2 ** 0.5
+
+    # rotationally symmetric formula based on histogram of distance-value scatterplot:
+    lag1 = (dist <= 1) * dist + (dist > 1) * (dist - s2) / (1 - s2)
+    lag1 /= lag1.sum()
+
+    # fitted polynomial
+    lag2 = x * x + y * y - 2 * x * x * y * y
+    lag2 /= lag2.sum()
+
+    lag = lag1 * weight + lag2 * (1 - weight)
+    return lag
+
+
+def lagrangian_to_lower_bound(lagrangian, set_system):
+    dual_covers = lagrangian.flatten().dot(set_system.astype(int))
+    # for each slice, the sum of the lagrangian at its elements
+    # supposed to be smaller than 1, but here the lagrangian is unnormalized yet.
+    worst = max(dual_covers)
+    lb = np.sum(lagrangian) / worst
+    print("lower bound", lb)
+
+    # plt.hist(dual_covers * np.sum(lagrangian) / worst, bins=30)
+    # plt.show()
+
+
+def tune_mixing_weight():
+    for weight in np.linspace(0, 1, 20):
+        lagrangian = create_lagrangian(shape, weight)
+        print(weight)
+        lagrangian_to_lower_bound(lagrangian, ss)
+
+
+print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape, 1) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
+
+# cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
+
+
 g = setcover.SetCover(ss, cost, maxiters=maxiters)
-print("starting")
+print("starting set cover solver")
 solution, time_used = g.SolveSCP()
 bitvec = g.s
 solution = collected_slices[bitvec, :].reshape((-1, n, m))

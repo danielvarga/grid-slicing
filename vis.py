@@ -12,8 +12,8 @@ n, m = a.shape
 
 def mygrid(shape):
     n, m = shape
-    xi = np.arange(n + 1)
-    yi = np.arange(m + 1)
+    xi = np.arange(n)
+    yi = np.arange(m)
     xx, yy = np.meshgrid(xi, yi)
     # g = np.stack([np.arange(n + 1)[:, np.newaxis], np.arange(m + 1)[np.newaxis, :]], axis=-1)
     g = np.stack([xx, yy], axis=-1)
@@ -21,16 +21,38 @@ def mygrid(shape):
 
 g = mygrid(a.shape)
 
-x = g[:, :, 0] / n * 2 - 1
-y = g[:, :, 1] / m * 2 - 1
+x = g[:, :, 0] / (n - 1) * 2 - 1
+y = g[:, :, 1] / (m - 1) * 2 - 1
 
-dist = np.sqrt(x * x + y * y)
 
-plt.scatter(dist[:-1, :-1].flatten(), a.flatten(), c=np.minimum(np.abs(x[:-1, :-1]), np.abs(y[:-1, :-1])).flatten())
+X = x.flatten()
+Y = y.flatten()
+
+P = np.array([X*0+1, X, Y, X**2, X**2*Y, X**2*Y**2, Y**2, X*Y**2, X*Y]).T
+Q = a.flatten()
+print(P.shape, Q.shape)
+
+coeff, r, rank, s = np.linalg.lstsq(P, Q)
+print(coeff, rank, s)
+
+prediction = P.dot(coeff).reshape((n, m))
+plt.imshow(prediction)
 plt.show()
 
 
-surface = np.exp(-np.abs(np.sqrt(x * x + y * y) - 1)) / 20
+coeff[np.abs(coeff) < 1e-3] = 0
+print(coeff)
+prediction = P.dot(coeff).reshape((n, m))
+plt.imshow(prediction)
+plt.show()
 
-plt.imshow(surface)
+
+dist = np.sqrt(x * x + y * y)
+
+plt.scatter(dist.flatten(), a.flatten(), c=np.minimum(np.abs(x), np.abs(y)).flatten())
+plt.title("distance from origin vs value, empirical.\ncolor:distance from axes")
+plt.show()
+
+plt.scatter(dist.flatten(), prediction.flatten(), c=np.minimum(np.abs(x), np.abs(y)).flatten())
+plt.title("distance from origin vs value, analytical approximation.\ncolor:distance from axes")
 plt.show()
