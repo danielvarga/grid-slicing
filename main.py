@@ -51,71 +51,6 @@ def mygrid(shape):
     return g
 
 
-# returns all rational numbers x in [0, n] for which
-# there are two points on the grid collinear with (x, 0).
-#
-# this broadcasting-based algorithm is very fast
-# but goes to hell memory-wise for large ns.
-# don't try with n > 100.
-def intersect_all_with_side(shape):
-    g = mygrid(shape)
-    n, m = shape
-    nc, mc = n + 1, m + 1
-    x1 = g[:, :, 0].reshape((nc, mc, 1, 1))
-    y1 = g[:, :, 1].reshape((nc, mc, 1, 1))
-    x2 = g[:, :, 0].reshape((1, 1, nc, mc))
-    y2 = g[:, :, 1].reshape((1, 1, nc, mc))
-
-    print("broadcasting")
-    dividents = x1 * y2 - x2 * y1
-    divisors = y2 - y1
-    print("broadcasted")
-
-    nonzero = divisors != 0
-    dividents = dividents[nonzero]
-    divisors = divisors[nonzero]
-    print("zero-filtered")
-
-    g = np.gcd(dividents, divisors)
-    dividents //= g
-    divisors //= g
-    print("simplified")
-
-    signs = np.sign(divisors)
-    dividents *= signs
-    divisors *= signs
-    print("sign-simlified")
-
-    nonnegative = dividents >= 0
-    dividents = dividents[nonnegative]
-    divisors = divisors[nonnegative]
-    print("nonnegative-filtered")
-
-    bounded = dividents <= n * divisors
-    dividents = dividents[bounded]
-    divisors = divisors[bounded]
-    print("bounded-filtered")
-
-    fractions = np.stack([dividents, divisors], axis=-1)
-    print(fractions.shape)
-    fractions = np.unique(fractions, axis=0)
-    print("unique")
-    sorted_fractions = np.array(sort_fractions(fractions))
-    print("sorted")
-    return sorted_fractions
-
-
-# todo normalize, but i guess it's never in fact unnormalized
-def region_centers(cutpoints):
-    return average_fractions(cutpoints[:-1], cutpoints[1:])
-
-
-cutpoints = intersect_all_with_side((5, 5))
-centers = region_centers(cutpoints)
-print(centers)
-exit()
-
-
 # todo vectorize
 def normalize(frac):
     a, b = frac
@@ -124,6 +59,10 @@ def normalize(frac):
         a, b = -a, -b
     g = np.gcd(a, b)
     return a // g, b // g
+
+
+def pretty(s):
+    return str(s.astype(int)).replace('1', '■').replace('0', '·').replace('[', ' ').replace(']', ' ').replace(' ', '')
 
 
 def slow_slices(line, shape):
@@ -161,6 +100,197 @@ def test_fast_slicing_implementation():
         assert np.all(result == slow_result)
 
 # test_fast_slicing_implementation() ; exit()
+
+
+# returns all rational numbers x in [0, n] for which
+# there are two points on the grid collinear with (x, 0).
+#
+# this broadcasting-based algorithm is very fast
+# but goes to hell memory-wise for large ns.
+# don't try with n > 100.
+def intersect_all_with_side(shape):
+    g = mygrid(shape)
+    n, m = shape
+    nc, mc = n + 1, m + 1
+    x1 = g[:, :, 0].reshape((nc, mc, 1, 1))
+    y1 = g[:, :, 1].reshape((nc, mc, 1, 1))
+    x2 = g[:, :, 0].reshape((1, 1, nc, mc))
+    y2 = g[:, :, 1].reshape((1, 1, nc, mc))
+
+    print("broadcasting")
+    dividents = x1 * y2 - x2 * y1
+    divisors = y2 - y1
+    print("broadcasted")
+
+    nonzero = divisors != 0
+    dividents = dividents[nonzero]
+    divisors = divisors[nonzero]
+    print("zero-filtered")
+
+    g = np.gcd(dividents, divisors)
+    dividents //= g
+    divisors //= g
+    print("simplified")
+
+    signs = np.sign(divisors)
+    dividents *= signs
+    divisors *= signs
+    print("sign-simplified")
+
+    nonnegative = dividents >= 0
+    dividents = dividents[nonnegative]
+    divisors = divisors[nonnegative]
+    print("nonnegative-filtered")
+
+    bounded = dividents <= n * divisors
+    dividents = dividents[bounded]
+    divisors = divisors[bounded]
+    print("bounded-filtered")
+
+    fractions = np.stack([dividents, divisors], axis=-1)
+    print(fractions.shape)
+    fractions = np.unique(fractions, axis=0)
+    print("unique")
+    sorted_fractions = np.array(sort_fractions(fractions))
+    print("sorted")
+    return sorted_fractions
+
+
+# todo normalize, but i guess it's never in fact unnormalized
+def region_centers(cutpoints):
+    return average_fractions(cutpoints[:-1], cutpoints[1:])
+
+
+def cross(p1, p2):
+    return p1[0] * p2[1] - p2[0] * p1[1]
+
+def sweep(shape, fraction):
+    # TODO don't use floating point
+    f = tof(fraction)
+
+    # unused, just for reference
+    def floating_point_comparator(p1, p2):
+        p1tr = p1[0] - f, p1[1]
+        p2tr = p2[0] - f, p2[1]
+        return np.sign(cross(p1tr, p2tr))
+
+    p, q = fraction
+    def comparator(p1, p2):
+        # ts as in translated and scaled
+        p1ts = p1[0] * q - p, p1[1] * q
+        p2ts = p2[0] * q - p, p2[1] * q
+        return np.sign(cross(p1ts, p2ts))
+
+    n, m = shape
+    g = mygrid((n, m)).reshape((-1, 2))
+
+    ordered = sorted(g, key=cmp_to_key(comparator))
+    return ordered
+
+
+def test_sweep():
+    shape = 50, 52
+    fraction = 25, 1
+    ordered = np.array(sweep(shape, fraction))
+    plt.scatter(ordered[:, 0], ordered[:, 1], c=range(len(ordered)))
+    plt.show()
+
+# test_sweep()
+
+
+
+def line_through(fraction, point):
+    p, q = fraction # interpreted as point (p/q, 0)
+    x, y = point
+    # solving
+    # 1. a*x + b*y + c = 0
+    # 2. a*p/q + b*0 + c = 0
+    # in integers (a, b, c) yields this:
+    a = q * y
+    c = p * y
+    b = - p - q * x
+    return a, b, c
+
+
+shape = 5, 5
+cutpoints = intersect_all_with_side(shape)
+centers = region_centers(cutpoints)
+# print(centers)
+
+# returns a (?, n, m) boolean array of slicing sets,
+# namely all the sets whose line intersects the (0, 0) (0, n) side.
+# we will get from here to the complete set in collect_lines() by mirroring.
+def collect_lines_on_side(shape, centers):
+    print("collect_lines_on_side() still buggy, seems only to collect downward-sloping lines")
+    ss = set()
+    total_attempts = 0
+    reasonable_attempts = 0
+    for j, fraction in enumerate(centers):
+        p, q = fraction
+        ordered = np.array(sweep(shape, fraction))
+        # TODO line_through could be vectorized and applied to ordered in one go.
+        k = len(ordered)
+        for i in range(k - 1):
+            p1, p2 = ordered[i], ordered[i + 1]
+            p1ts = p1[0] * q - p, p1[1] * q
+            p2ts = p2[0] * q - p, p2[1] * q
+            c = cross(p1ts, p2ts)
+            assert c <= 0
+            total_attempts += 1
+            if c == 0:
+                continue
+            reasonable_attempts += 1
+            # find the two normal equations and sum them:
+            line1 = line_through(fraction, p1)
+            line2 = line_through(fraction, p2)
+            line = np.array(line1) + np.array(line2)
+            result = slices(line, shape)
+            result_tup = tuple(map(tuple, result))
+            ss.add(result_tup)
+        if j % 1000 == 0:
+            print(total_attempts, reasonable_attempts, len(ss))
+    return np.array(list(ss))
+
+
+def collect_lines(shape, centers):
+    assert shape[0] == shape[1], "currently only implemented for squares, sorry."
+    bitvectors = collect_lines_on_side(shape, centers)
+    print(bitvectors.shape, "bitvectors.shape")
+    complete = []
+    for flip_horiz in (False, True):
+        bvs = bitvectors
+        if flip_horiz:
+            bvs = bvs[:, :, ::-1]
+        for flip_vert in (False, True):
+            if flip_vert:
+                bvs = bvs[:, ::-1, :]
+            for transpose in (False, True):
+                if transpose:
+                    bvs = np.swapaxes(bvs, 1, 2)
+                complete.append(bvs)
+    complete = np.concatenate(complete)
+    print(complete.shape)
+    uniq = np.unique(complete, axis=0)
+    print("uniq", uniq.shape)
+    return uniq
+
+    for bv in bitvectors:
+        print(pretty(bv))
+        print()
+    print("====")
+    vert_mirrored = bitvectors[:, ::-1, :]
+    horiz_mirrored = bitvectors[:, :, ::-1]
+    print()
+    print(pretty(horiz_mirrored[0]))
+    collected = np.concatenate([bitvectors, horiz_mirrored])
+    print(collected.shape, "collected.shape")
+    uniq = np.unique(collected, axis=0)
+    print("uniq", uniq.shape)
+    return collected
+
+lines = collect_lines(shape, centers)
+print("lines, exact, maybe buggy", lines.shape)
+
 
 def random_point_of_rect_boundary(shape):
     n, m = shape
@@ -291,9 +421,6 @@ def parametrized_collect_slices(shape, granularity):
     return ss
 
 
-def pretty(s):
-    return str(s.astype(int)).replace('1', '■').replace('0', '·').replace('[', ' ').replace(']', ' ').replace(' ', '')
-
 # nr_of_lines=2 (-1, +1)
 # nr_of_lines=3  (-2, 0, 2)
 def create_waist(shape, nr_of_lines):
@@ -333,7 +460,7 @@ def build_set_system(shape, samples, patience, waist=None):
     return collected_slices, ss, cost
 
 
-shape = 8, 8
+# shape = 10, 10
 
 n, m = shape
 samples = 200000
