@@ -165,10 +165,8 @@ def cross(p1, p2):
     return p1[0] * p2[1] - p2[0] * p1[1]
 
 def sweep(shape, fraction):
-    # TODO don't use floating point
-    f = tof(fraction)
-
     # unused, just for reference
+    f = tof(fraction)
     def floating_point_comparator(p1, p2):
         p1tr = p1[0] - f, p1[1]
         p2tr = p2[0] - f, p2[1]
@@ -189,15 +187,13 @@ def sweep(shape, fraction):
 
 
 def test_sweep():
-    shape = 50, 52
-    fraction = 25, 1
+    shape = 50, 51
+    fraction = 51, 2
     ordered = np.array(sweep(shape, fraction))
     plt.scatter(ordered[:, 0], ordered[:, 1], c=range(len(ordered)))
     plt.show()
 
-# test_sweep()
-
-
+# test_sweep() ; exit()
 
 def line_through(fraction, point):
     p, q = fraction # interpreted as point (p/q, 0)
@@ -206,16 +202,76 @@ def line_through(fraction, point):
     # 1. a*x + b*y + c = 0
     # 2. a*p/q + b*0 + c = 0
     # in integers (a, b, c) yields this:
-    a = q * y
+    a = - q * y
     c = p * y
     b = - p - q * x
     return a, b, c
 
 
+def apply(line, point):
+    a, b, c = line
+    x, y = point
+    return a * x + b * y + c
+
+
+def test_line_through():
+    fraction = (5, 4)
+    point = (0, 1)
+    f = tof(fraction)
+    line = line_through(fraction, point)
+    print(apply(line, (5/4, 0)))
+    print(apply(line, point))
+
+# test_line_through() ; exit()
+
 shape = 3, 3
 cutpoints = intersect_all_with_side(shape)
+# print("cutpoints", [tof(c) for c in cutpoints])
 centers = region_centers(cutpoints)
-# print(centers)
+# print("centers", [tof(c) for c in centers])
+
+
+# ss is mutated
+def lines_through_point(shape, fraction, ss):
+    p, q = fraction
+    ordered = np.array(sweep(shape, fraction))
+    # TODO line_through could be vectorized and applied to ordered in one go.
+    k = len(ordered)
+    attempts = 0
+    for i in range(k - 1):
+        p1, p2 = ordered[i], ordered[i + 1]
+        print(i, p1, p2)
+        p1ts = p1[0] * q - p, p1[1] * q
+        p2ts = p2[0] * q - p, p2[1] * q
+        c = cross(p1ts, p2ts)
+        assert c <= 0
+        if c == 0:
+            print("skipped collinear", p1, p2)
+            continue
+        attempts += 1
+        # find the two normal equations and sum them:
+        line1 = line_through(fraction, p1)
+        line2 = line_through(fraction, p2)
+        line = np.array(line1) + np.array(line2)
+        print("p1", p1, "p2", p2, "line", line)
+
+        assert line[0] * p + line[2] * q == 0
+        if not(apply(line, p1) * apply(line, p2) < 0):
+            print("halting, this should not happen")
+            print(line1, line2)
+            print(line)
+            exit()
+
+        result = slices(line, shape).astype(int)
+        result_tup = tuple(map(tuple, result))
+        ss.add(result_tup)
+    return ss, attempts
+
+
+ss = set() ; ss, attempts = lines_through_point(shape, fraction=(5, 4), ss=ss)
+print(ss)
+exit()
+
 
 # returns a (?, n, m) boolean array of slicing sets,
 # namely all the sets whose line intersects the (0, 0) (0, n) side.
@@ -224,40 +280,22 @@ def collect_lines_on_side(shape, centers):
     print("collect_lines_on_side() still buggy, seems only to collect downward-sloping lines")
     ss = set()
     total_attempts = 0
-    reasonable_attempts = 0
     for j, fraction in enumerate(centers):
-        p, q = fraction
-        ordered = np.array(sweep(shape, fraction))
-        # TODO line_through could be vectorized and applied to ordered in one go.
-        k = len(ordered)
-        for i in range(k - 1):
-            p1, p2 = ordered[i], ordered[i + 1]
-            p1ts = p1[0] * q - p, p1[1] * q
-            p2ts = p2[0] * q - p, p2[1] * q
-            c = cross(p1ts, p2ts)
-            assert c <= 0
-            total_attempts += 1
-            if c == 0:
-                continue
-            reasonable_attempts += 1
-            # find the two normal equations and sum them:
-            line1 = line_through(fraction, p1)
-            line2 = line_through(fraction, p2)
-            line = np.array(line1) + np.array(line2)
-            result = slices(line, shape)
-            result_tup = tuple(map(tuple, result))
-            ss.add(result_tup)
+        ss, attempts = lines_through_point(shape, fraction, ss)
+        total_attempts += attempts
         if j % 1000 == 0:
-            print(total_attempts, reasonable_attempts, len(ss))
+            print(total_attempts, len(ss))
     return np.array(list(ss))
+
+
+
+# print(collect_lines_on_side(shape, centers).astype(int)) ; exit()
 
 
 def collect_lines(shape, centers):
     assert shape[0] == shape[1], "currently only implemented for squares, sorry."
     bitvectors = collect_lines_on_side(shape, centers)
-    print(bitvectors.shape, "bitvectors.shape")
-    print(bitvectors.astype(int))
-    print("bitvecs^")
+    print("before_mirroring", bitvectors.shape)
     complete = []
     for flip_horiz in (False, True):
         for flip_vert in (False, True):
