@@ -460,7 +460,7 @@ def build_set_system(shape, samples, patience, waist=None):
     return collected_slices, ss, cost
 
 
-# shape = 10, 10
+shape = 12, 12
 
 n, m = shape
 samples = 200000
@@ -499,6 +499,11 @@ def create_lagrangian(shape, weight):
     lag2 = x * x + y * y - 2 * x * x * y * y
     lag2 /= lag2.sum()
 
+    # formula based on histogram of L1-distance - value scatterplot.
+    # worse than the others, currently unused
+    l1_dist = np.abs(x) + np.abs(y)
+    lag3 = (l1_dist <= 1) * l1_dist * l1_dist  + (l1_dist > 1) * (2 - l1_dist)
+
     lag = lag1 * weight + lag2 * (1 - weight)
     return lag
 
@@ -508,10 +513,11 @@ def lagrangian_to_lower_bound(lagrangian, set_system):
     # for each slice, the sum of the lagrangian at its elements
     # supposed to be smaller than 1, but here the lagrangian is unnormalized yet.
     worst = max(dual_covers)
+    dual_covers /= worst
     lb = np.sum(lagrangian) / worst
     print("lower bound", lb)
 
-    # plt.hist(dual_covers * np.sum(lagrangian) / worst, bins=30)
+    # plt.hist(dual_covers, bins=30)
     # plt.show()
 
 
@@ -524,7 +530,7 @@ def tune_mixing_weight():
 
 # print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape, 1) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
 
-# cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
+cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
 
 
 

@@ -56,3 +56,9 @@ plt.show()
 plt.scatter(dist.flatten(), prediction.flatten(), c=np.minimum(np.abs(x), np.abs(y)).flatten())
 plt.title("distance from origin vs value, analytical approximation.\ncolor:distance from axes")
 plt.show()
+
+l1_dist = np.abs(x) + np.abs(y)
+
+plt.scatter(l1_dist.flatten(), a.flatten(), c=np.minimum(np.abs(x), np.abs(y)).flatten())
+plt.title("L1 distance from origin vs value, empirical.\ncolor:distance from axes")
+plt.show()
