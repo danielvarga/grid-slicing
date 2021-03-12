@@ -311,7 +311,23 @@ def parametrized_collect_slices(shape, granularity):
     return ss
 
 
-def build_set_system(shape, samples, patience):
+def pretty(s):
+    return str(s.astype(int)).replace('1', '■').replace('0', '·').replace('[', ' ').replace(']', ' ').replace(' ', '')
+
+# nr_of_lines=2 (-1, +1)
+# nr_of_lines=3  (-2, 0, 2)
+def create_waist(shape, nr_of_lines):
+    waist_slices = []
+    agg = np.zeros(shape, dtype=int)
+    for c in range(-nr_of_lines+1, nr_of_lines, 2):
+        line = (1, -1, c - 0.5)
+        s = slices(line, shape)
+        # print(pretty(s))
+        agg += s.astype(int)
+    return agg
+
+
+def build_set_system(shape, samples, patience, waist=None):
     filename = "%d-%d.npy" % shape
     try:
         f = open(filename, "rb")
@@ -323,6 +339,12 @@ def build_set_system(shape, samples, patience):
         collected_slices = np.array(list(cs))
         np.save(open("%d-%d.npy" % shape, "wb"), collected_slices)
 
+    if waist is not None:
+        collected_slices = list(collected_slices)
+        collected_slices.append(waist)
+        collected_slices = np.array(collected_slices)
+        print("added waist")
+
     ss = collected_slices
     ss = ss.reshape((len(ss), -1)) # flatten the nxm grids to n*m vectors
     ss = ss.T
@@ -331,13 +353,26 @@ def build_set_system(shape, samples, patience):
     return collected_slices, ss, cost
 
 
-shape = 50, 50
+shape = 8, 8
 
 n, m = shape
-samples = 20000
+samples = 200000
 patience = 10000
-maxiters = 2 # unlike the upper bound which needs luck, the lower bound normally converges after maxiters=2.
-collected_slices, ss, cost = build_set_system((n, m), samples=samples, patience=patience)
+maxiters = 200 # unlike the upper bound which needs luck, the lower bound normally converges after maxiters=2.
+
+# unfortunately it seem like even nr_of_waist_lines=2 (that is, forcing the two middle diagonals into the cover)
+# prevents the optimizer from finding an n-1 solution, probably because it does not even exist with this restriction.
+do_waist_hack = False
+if do_waist_hack:
+    nr_of_waist_lines = 2
+    print("adding a single set to the system that is worth %d lines" % nr_of_waist_lines)
+    print("please add %d to the upper bound manually" % (nr_of_waist_lines - 1))
+    waist = create_waist(shape, nr_of_waist_lines)
+    print(pretty(waist))
+else:
+    waist = None
+
+collected_slices, ss, cost = build_set_system((n, m), samples=samples, patience=patience, waist=waist)
 print(collected_slices.shape, ss.shape, cost.shape)
 
 
@@ -380,9 +415,10 @@ def tune_mixing_weight():
         lagrangian_to_lower_bound(lagrangian, ss)
 
 
-print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape, 1) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
+# print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape, 1) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
 
 # cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
+
 
 
 g = setcover.SetCover(ss, cost, maxiters=maxiters)
@@ -393,7 +429,7 @@ solution = collected_slices[bitvec, :].reshape((-1, n, m))
 agg = np.zeros((n, m), dtype=int)
 for i, s in enumerate(solution):
     # print(i)
-    # print(str(s.astype(int)).replace('1', '■').replace('0', '·').replace('[', ' ').replace(']', ' ').replace(' ', ''))
+    # print(pretty(s))
     agg += s.astype(int)
 
 print("aggregate")
