@@ -212,7 +212,7 @@ def line_through(fraction, point):
     return a, b, c
 
 
-shape = 5, 5
+shape = 3, 3
 cutpoints = intersect_all_with_side(shape)
 centers = region_centers(cutpoints)
 # print(centers)
@@ -256,15 +256,17 @@ def collect_lines(shape, centers):
     assert shape[0] == shape[1], "currently only implemented for squares, sorry."
     bitvectors = collect_lines_on_side(shape, centers)
     print(bitvectors.shape, "bitvectors.shape")
+    print(bitvectors.astype(int))
+    print("bitvecs^")
     complete = []
     for flip_horiz in (False, True):
-        bvs = bitvectors
-        if flip_horiz:
-            bvs = bvs[:, :, ::-1]
         for flip_vert in (False, True):
-            if flip_vert:
-                bvs = bvs[:, ::-1, :]
             for transpose in (False, True):
+                bvs = bitvectors
+                if flip_horiz:
+                    bvs = bvs[:, :, ::-1]
+                if flip_vert:
+                    bvs = bvs[:, ::-1, :]
                 if transpose:
                     bvs = np.swapaxes(bvs, 1, 2)
                 complete.append(bvs)
@@ -288,8 +290,8 @@ def collect_lines(shape, centers):
     print("uniq", uniq.shape)
     return collected
 
-lines = collect_lines(shape, centers)
-print("lines, exact, maybe buggy", lines.shape)
+exact_lines = collect_lines(shape, centers).astype(int)
+print("lines, exact, maybe buggy", exact_lines.shape)
 
 
 def random_point_of_rect_boundary(shape):
@@ -400,6 +402,21 @@ def collect_slices(shape, samples, patience):
             print(total_attempts, attempts, len(ss))
     return ss
 
+sampled_lines = np.array(list(collect_slices(shape, 50000, 10000))).astype(int)
+print("lines, sampled", len(sampled_lines))
+print(sampled_lines)
+
+def totuple(a):
+    try:
+        return tuple(totuple(i) for i in a)
+    except TypeError:
+        return a
+
+sampled_lines_set = set(totuple(sampled_lines))
+exact_lines_set = set(totuple(exact_lines))
+print("diff", sampled_lines_set.difference(exact_lines_set))
+
+exit()
 
 def parametrized_collect_slices(shape, granularity):
     ss = set()
@@ -461,6 +478,7 @@ def build_set_system(shape, samples, patience, waist=None):
 
 
 shape = 12, 12
+
 
 n, m = shape
 samples = 200000
