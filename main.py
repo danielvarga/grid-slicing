@@ -146,6 +146,64 @@ def collect_boundary_points(shape):
     return points
 
 
+from functools import cmp_to_key
+
+def sort_fractions(a):
+    def comparator(x, y):
+        a, b = x # a/b
+        c, d = y # c/d
+        return a * d - c * b
+    return sorted(a, key=cmp_to_key(comparator))
+
+def test_sort_fractions():
+    print(sort_fractions([(3, 2), (4, 3), (-1, 2)]))
+
+
+def tof(x): # to float
+    return x[0] / x[1]
+
+
+def average_fractions(x, y):
+    a, b = x # a/b
+    c, d = y # c/d
+    # a/b + c/d = (ad + cb) / 2bd
+    return normalize((a * d + c * b, 2 * b * d))
+
+
+def test_average_fractions():
+    for _ in range(1000):
+        a = np.random.randint(low=-10, high=10, size=(2, 2))
+        if a[0, 1] == 0 or a[1, 1] == 0:
+            continue
+        x = normalize(a[0, :])
+        y = normalize(a[1, :])
+        avg = average_fractions(x, y)
+        assert np.isclose(tof(avg), (tof(x) + tof(y)) / 2)
+
+# test_average_fractions() ; exit()
+
+# input: a set of points on the boundary of the box, in fractional format.
+# removing this set from the boundary splits it into open line segments.
+# output: a point from each segment.
+# it is assumed that the box corners are in the input.
+def boundary_region_centers(boundary_points):
+    bs = [(xup, xdown) for ((xup, xdown), (yup, ydown)) in boundary_points if yup == 0]
+    print("identified %d boundary points on single side out of %d" % (len(bs), len(boundary_points)))
+    bs = sort_fractions(bs)
+    centers = []
+    for i in range(len(bs) - 1):
+        centers.append(average_fractions(bs[i], bs[i + 1]))
+    raise "todo put back on 2d plane, todo do it for all sides, employing symmetry"
+    return centers
+
+
+shape = 20, 20
+boundary_points = collect_boundary_points(shape)
+centers = boundary_region_centers(boundary_points)
+
+
+exit()
+
 def slow_slices(line, shape):
     n, m = shape
     a, b, c = line
