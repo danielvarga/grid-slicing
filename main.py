@@ -1,16 +1,48 @@
 import sys
 from collections import defaultdict
 import numpy as np
-import SetCoverPy.setcover as setcover
+from functools import cmp_to_key
 
 import matplotlib.pyplot as plt
 
+import SetCoverPy.setcover as setcover
 
-# the next two functions are part of an abandoned attempt to
-# find all slices where the line goes through a specific point.
-# the idea was that we draw lines between all point pairs, intersect these
-# lines with a bounding circle, and this splits the circle into arcs.
-# we then pick a point on each arc, and run this search.
+
+def sort_fractions(a):
+    def comparator(x, y):
+        a, b = x # a/b
+        c, d = y # c/d
+        return a * d - c * b
+    return sorted(a, key=cmp_to_key(comparator))
+
+def test_sort_fractions():
+    print(sort_fractions([(3, 2), (4, 3), (-1, 2)]))
+
+
+def tof(x): # to float
+    return x[0] / x[1]
+
+
+# not normalized!
+def average_fractions(x, y):
+    a, b = x[..., 0], x[..., 1] # a/b
+    c, d = y[..., 0], y[..., 1] # c/d
+    # a/b + c/d = (ad + cb) / 2bd
+    return np.stack([a * d + c * b, 2 * b * d], axis=-1)
+
+
+def test_average_fractions():
+    for _ in range(1000):
+        a = np.random.randint(low=-10, high=10, size=(2, 2))
+        if a[0, 1] == 0 or a[1, 1] == 0:
+            continue
+        x = normalize(a[0, :])
+        y = normalize(a[1, :])
+        avg = average_fractions(x, y)
+        assert np.isclose(tof(avg), (tof(x) + tof(y)) / 2)
+
+# test_average_fractions() ; exit()
+
 
 def mygrid(shape):
     n, m = shape
@@ -21,6 +53,79 @@ def mygrid(shape):
     g = np.stack([xx, yy], axis=-1)
     return g
 
+
+# returns all rational numbers x in [0, n] for which
+# there are two points on the grid collinear with (x, 0).
+#
+# this broadcasting-based algorithm is very fast
+# but goes to hell memory-wise for large ns.
+# don't try with n > 100.
+def intersect_all_with_side(shape):
+    g = mygrid(shape)
+    n, m = shape
+    nc, mc = n + 1, m + 1
+    x1 = g[:, :, 0].reshape((nc, mc, 1, 1))
+    y1 = g[:, :, 1].reshape((nc, mc, 1, 1))
+    x2 = g[:, :, 0].reshape((1, 1, nc, mc))
+    y2 = g[:, :, 1].reshape((1, 1, nc, mc))
+
+    print("broadcasting")
+    dividents = x1 * y2 - x2 * y1
+    divisors = y2 - y1
+    print("broadcasted")
+
+    nonzero = divisors != 0
+    dividents = dividents[nonzero]
+    divisors = divisors[nonzero]
+    print("zero-filtered")
+
+    g = np.gcd(dividents, divisors)
+    dividents //= g
+    divisors //= g
+    print("simplified")
+
+    signs = np.sign(divisors)
+    dividents *= signs
+    divisors *= signs
+    print("sign-simlified")
+
+    nonnegative = dividents >= 0
+    dividents = dividents[nonnegative]
+    divisors = divisors[nonnegative]
+    print("nonnegative-filtered")
+
+    bounded = dividents <= n * divisors
+    dividents = dividents[bounded]
+    divisors = divisors[bounded]
+    print("bounded-filtered")
+
+    fractions = np.stack([dividents, divisors], axis=-1)
+    print(fractions.shape)
+    fractions = np.unique(fractions, axis=0)
+    print("unique")
+    sorted_fractions = np.array(sort_fractions(fractions))
+    print("sorted")
+    return sorted_fractions
+
+
+# todo normalize, but i guess it's never in fact unnormalized
+def region_centers(cutpoints):
+    return average_fractions(cutpoints[:-1], cutpoints[1:])
+
+
+cutpoints = intersect_all_with_side((5, 5))
+centers = region_centers(cutpoints)
+print(centers)
+exit()
+
+
+
+
+# the next function is part of an abandoned attempt to
+# find all slices where the line goes through a specific point.
+# the idea was that we draw lines between all point pairs, intersect these
+# lines with a bounding circle, and this splits the circle into arcs.
+# we then pick a point on each arc, and run this search.
 
 def view_from_point(shape, p):
     x, y = p
@@ -145,42 +250,6 @@ def collect_boundary_points(shape):
     print("%d boundary points collected" % len(points))
     return points
 
-
-from functools import cmp_to_key
-
-def sort_fractions(a):
-    def comparator(x, y):
-        a, b = x # a/b
-        c, d = y # c/d
-        return a * d - c * b
-    return sorted(a, key=cmp_to_key(comparator))
-
-def test_sort_fractions():
-    print(sort_fractions([(3, 2), (4, 3), (-1, 2)]))
-
-
-def tof(x): # to float
-    return x[0] / x[1]
-
-
-def average_fractions(x, y):
-    a, b = x # a/b
-    c, d = y # c/d
-    # a/b + c/d = (ad + cb) / 2bd
-    return normalize((a * d + c * b, 2 * b * d))
-
-
-def test_average_fractions():
-    for _ in range(1000):
-        a = np.random.randint(low=-10, high=10, size=(2, 2))
-        if a[0, 1] == 0 or a[1, 1] == 0:
-            continue
-        x = normalize(a[0, :])
-        y = normalize(a[1, :])
-        avg = average_fractions(x, y)
-        assert np.isclose(tof(avg), (tof(x) + tof(y)) / 2)
-
-# test_average_fractions() ; exit()
 
 # input: a set of points on the boundary of the box, in fractional format.
 # removing this set from the boundary splits it into open line segments.
