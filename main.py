@@ -30,7 +30,6 @@ def average_fractions(x, y):
     # a/b + c/d = (ad + cb) / 2bd
     return np.stack([a * d + c * b, 2 * b * d], axis=-1)
 
-
 def test_average_fractions():
     for _ in range(1000):
         a = np.random.randint(low=-10, high=10, size=(2, 2))
@@ -40,8 +39,6 @@ def test_average_fractions():
         y = normalize(a[1, :])
         avg = average_fractions(x, y)
         assert np.isclose(tof(avg), (tof(x) + tof(y)) / 2)
-
-# test_average_fractions() ; exit()
 
 
 def mygrid(shape):
@@ -119,57 +116,7 @@ print(centers)
 exit()
 
 
-
-
-# the next function is part of an abandoned attempt to
-# find all slices where the line goes through a specific point.
-# the idea was that we draw lines between all point pairs, intersect these
-# lines with a bounding circle, and this splits the circle into arcs.
-# we then pick a point on each arc, and run this search.
-
-def view_from_point(shape, p):
-    x, y = p
-    # todo move creation out of hot path
-    g = mygrid(shape)
-    f = g.astype(float).reshape((-1, 2)) # f as in flat, as in more flat than g
-    f[:, 0] -= x
-    f[:, 1] -= y
-    angles = np.arctan2(f[:, 0], f[:, 1])
-    perm = np.argsort(angles)
-    ordered = f[angles]
-
-# view_from_point((6, 7), (4.1, 5.1)) ; exit()
-
-
-# get lines for each pair of grid points, and intersect these lines with the big rectangle boundary.
-# use integer arithmetic as long as possible.
-def all_pairs_lines(shape):
-    g = mygrid(shape)
-    f = g.reshape((-1, 2))
-    lines = set()
-    for i1, (x1, y1) in enumerate(f):
-        for i2, (x2, y2) in enumerate(f):
-            if i2 <= i1:
-                continue
-            a = y1-y2
-            b = x2-x1 # reversed!
-            c = (y2-y1)*x1-(x2-x1)*y1
-            g = np.gcd.reduce([a, b, c])
-            a //= g
-            b //= g
-            c //= g
-            # in principle sign is unnormalized, can coincide. in practice it can't because p1 < p2 lexicographically.
-            lines.add((a, b, c))
-    return lines
-
-
-# does frac[0]/frac[1] intersect [0, n]?
-def rational_intersection(frac, n):
-    a, b = frac
-    assert b > 0
-    return (b != 0) and (a * b >= 0) and (a <= b*n)
-
-
+# todo vectorize
 def normalize(frac):
     a, b = frac
     assert b != 0
@@ -178,100 +125,6 @@ def normalize(frac):
     g = np.gcd(a, b)
     return a // g, b // g
 
-
-# returns the intersection of line and big box boundary,
-# in format ((x_divident, x_divisor), (y_divident, y_divisor))
-def line_box_intersect(shape, line):
-    a, b, c = line
-    n, m = shape
-    # intersection is when a*x+b*y+c==0
-
-    ps = []
-    # case x = 0
-    if b !=0:
-        frac = normalize((-c, b))
-        if rational_intersection(frac, m):
-            ps.append(((0, 1), frac))
-    # case x = n
-    if b!=0:
-        frac = normalize((-c - a*n, b))
-        if rational_intersection(frac, m):
-            ps.append(((n, 1), frac))
-    # case y = 0
-    if a!=0:
-        frac = normalize((-c, a))
-        if rational_intersection(frac, n):
-            ps.append((frac, (0, 1)))
-    # case y = m
-    if a!=0:
-        frac = normalize((-c - b*m, a))
-        if rational_intersection(frac, n):
-            ps.append((frac, (m, 1)))
-    return ps
-
-def test_line_box_intersect():
-    shape = 10, 15
-    line = 1, -1, 0
-    print(line_box_intersect(shape, line))
-    line = -1, 1, 10
-    print(line_box_intersect(shape, line))
-
-
-# test_line_box_intersect() ; exit()
-
-
-def test_all_pairs():
-    shape = 11, 11
-    n, m = shape
-    lines = np.array(list(all_pairs_lines((n, m))))
-    print("%d lines collected" % len(lines))
-    points = set()
-    for line in lines:
-        ps = line_box_intersect(shape, line)
-        points |= set(ps)
-    print(len(points))
-    plt.scatter([xup/xdown for ((xup, xdown), (yup, ydown)) in points], [yup/ydown for ((xup, xdown), (yup, ydown)) in points])
-    plt.show()
-
-
-# test_all_pairs() ; exit()
-
-
-def collect_boundary_points(shape):
-    n, m = shape
-    print("shape %d, %d" % (n, m))
-    lines = np.array(list(all_pairs_lines((n, m))))
-    print("%d lines collected" % len(lines))
-    points = set()
-    for line in lines:
-        ps = line_box_intersect(shape, line)
-        points |= set(ps)
-    # seems like number of different boundary points is approximately n^3.
-    print("%d boundary points collected" % len(points))
-    return points
-
-
-# input: a set of points on the boundary of the box, in fractional format.
-# removing this set from the boundary splits it into open line segments.
-# output: a point from each segment.
-# it is assumed that the box corners are in the input.
-def boundary_region_centers(boundary_points):
-    bs = [(xup, xdown) for ((xup, xdown), (yup, ydown)) in boundary_points if yup == 0]
-    print("identified %d boundary points on single side out of %d" % (len(bs), len(boundary_points)))
-    bs = sort_fractions(bs)
-    centers = []
-    for i in range(len(bs) - 1):
-        centers.append(average_fractions(bs[i], bs[i + 1]))
-    raise "todo put back on 2d plane, todo do it for all sides, employing symmetry"
-    return centers
-
-
-shape = 20, 20
-boundary_points = collect_boundary_points(shape)
-centers = boundary_region_centers(boundary_points)
-
-
-exit()
 
 def slow_slices(line, shape):
     n, m = shape
