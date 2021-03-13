@@ -204,7 +204,22 @@ def line_through(fraction, point):
     # in integers (a, b, c) yields this:
     a = - q * y
     c = p * y
-    b = - p - q * x
+    b = - p + q * x
+    return a, b, c
+
+
+# line connecting (fraction, 0) and (point1+point2)/2
+# todo temporarily assuming that half-integer arithmetic is precise.
+def line_between(fraction, point1, point2):
+    p, q = fraction # interpreted as point (p/q, 0)
+    X, Y = (point1[0] + point2[0], point1[1] + point2[1])
+    # solving
+    # 1. a*X/2 + b*Y/2 + c = 0
+    # 2. a*p/q + b*0 + c = 0
+    # in integers (a, b, c) yields this:
+    a = - q * Y
+    c = p * Y
+    b = - 2 * p + q * X
     return a, b, c
 
 
@@ -224,7 +239,7 @@ def test_line_through():
 
 # test_line_through() ; exit()
 
-shape = 3, 3
+shape = 7, 7
 cutpoints = intersect_all_with_side(shape)
 # print("cutpoints", [tof(c) for c in cutpoints])
 centers = region_centers(cutpoints)
@@ -240,27 +255,17 @@ def lines_through_point(shape, fraction, ss):
     attempts = 0
     for i in range(k - 1):
         p1, p2 = ordered[i], ordered[i + 1]
-        print(i, p1, p2)
         p1ts = p1[0] * q - p, p1[1] * q
         p2ts = p2[0] * q - p, p2[1] * q
         c = cross(p1ts, p2ts)
         assert c <= 0
         if c == 0:
-            print("skipped collinear", p1, p2)
             continue
         attempts += 1
-        # find the two normal equations and sum them:
-        line1 = line_through(fraction, p1)
-        line2 = line_through(fraction, p2)
-        line = np.array(line1) + np.array(line2)
-        print("p1", p1, "p2", p2, "line", line)
 
+        line = line_between(fraction, p1, p2)
         assert line[0] * p + line[2] * q == 0
-        if not(apply(line, p1) * apply(line, p2) < 0):
-            print("halting, this should not happen")
-            print(line1, line2)
-            print(line)
-            exit()
+        assert apply(line, p1) * apply(line, p2) < 0
 
         result = slices(line, shape).astype(int)
         result_tup = tuple(map(tuple, result))
@@ -268,9 +273,7 @@ def lines_through_point(shape, fraction, ss):
     return ss, attempts
 
 
-ss = set() ; ss, attempts = lines_through_point(shape, fraction=(5, 4), ss=ss)
-print(ss)
-exit()
+# ss = set() ; ss, attempts = lines_through_point(shape, fraction=(5, 4), ss=ss) ; print(ss) ; exit()
 
 
 # returns a (?, n, m) boolean array of slicing sets,
@@ -298,16 +301,13 @@ def collect_lines(shape, centers):
     print("before_mirroring", bitvectors.shape)
     complete = []
     for flip_horiz in (False, True):
-        for flip_vert in (False, True):
-            for transpose in (False, True):
-                bvs = bitvectors
-                if flip_horiz:
-                    bvs = bvs[:, :, ::-1]
-                if flip_vert:
-                    bvs = bvs[:, ::-1, :]
-                if transpose:
-                    bvs = np.swapaxes(bvs, 1, 2)
-                complete.append(bvs)
+        for transpose in (False, True):
+            bvs = bitvectors
+            if flip_horiz:
+                bvs = bvs[:, :, ::-1]
+            if transpose:
+                bvs = np.swapaxes(bvs, 1, 2)
+            complete.append(bvs)
     complete = np.concatenate(complete)
     print(complete.shape)
     uniq = np.unique(complete, axis=0)
@@ -442,13 +442,14 @@ def collect_slices(shape, samples, patience):
 
 sampled_lines = np.array(list(collect_slices(shape, 50000, 10000))).astype(int)
 print("lines, sampled", len(sampled_lines))
-print(sampled_lines)
+
 
 def totuple(a):
     try:
         return tuple(totuple(i) for i in a)
     except TypeError:
         return a
+
 
 sampled_lines_set = set(totuple(sampled_lines))
 exact_lines_set = set(totuple(exact_lines))
