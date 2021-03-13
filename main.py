@@ -349,24 +349,20 @@ def random_point_of_rect_boundary(shape):
 def parametrized_point_of_rect_boundary(shape, z_orig):
     z = z_orig
     n, m = shape
-    horiz_mirror = z > (n + m)
-    if horiz_mirror:
+    center_mirror = z > (n + m)
+    if center_mirror:
         z -= n + m
-    vert_mirror = z > (n + m) / 2
-    if vert_mirror:
-        z -= (n + m) / 2
-    horizontal = z > n / 2
+    horizontal = z > n
     if horizontal:
-        z -= n / 2
+        z -= n
         # if horizontal, then z will be interpreted as second coordinate of shape. if not, as first coordinate.
         x = 0
         y = z
     else:
         x = z
         y = 0
-    if horiz_mirror:
+    if center_mirror:
         x = n - x
-    if vert_mirror:
         y = m - y
     return x, y
 
@@ -382,6 +378,7 @@ def test_parametrized_point():
 
 # test_parametrized_point() ; exit()
 
+
 def test_random_point():
     shape = 10, 15
     points = [random_point_of_rect_boundary(shape) for _ in range(1000)]
@@ -389,8 +386,8 @@ def test_random_point():
     plt.scatter(points[:, 0], points[:, 1])
     plt.show()
 
-
 # test_random_point() ; exit()
+
 
 def random_line(shape):
     x1, y1 = random_point_of_rect_boundary(shape)
@@ -408,6 +405,30 @@ def parametrized_line(shape, z1, z2):
     b = x2-x1 # reversed!
     c = (y2-y1)*x1-(x2-x1)*y1
     return a, b, c
+
+
+
+def visualize_partition(shape, granularity):
+    n, m = shape
+    zs = np.linspace(0, (n + m) * 2, granularity)
+    surface = np.zeros((granularity, granularity))
+    for i1, z1 in enumerate(zs):
+        for i2, z2 in enumerate(zs):
+            line = parametrized_line(shape, z1, z2)
+            result = slices(line, shape)
+
+            if np.sum(result.astype(int)) >= 1:
+                result_tup = tuple(map(tuple, result))
+                surface[i1, i2] = hash(result_tup)
+        if i1 % 100 == 0:
+            print(i1)
+    plt.figure(figsize=(20, 20))
+    plt.imshow(surface)
+    plt.xticks([])
+    plt.yticks([])
+    plt.savefig("mobius.%d-%d.png" % shape)
+
+# visualize_partition(shape=(5, 5), granularity=1000) ; exit()
 
 
 # do at most samples attempts, but halt prematurely if there's no new find in the last patience attempts.
@@ -444,6 +465,7 @@ def totuple(a):
 
 def parametrized_collect_lines(shape, granularity):
     ss = set()
+    n, m = shape
     zs = np.linspace(0, (n + m) * 2, granularity)
     total_attempts = 0
     for i1, z1 in enumerate(zs):
@@ -500,6 +522,13 @@ def build_set_system(shape, samples, patience, waist=None):
     # now ss.shape == (number of points, number of sets).
     cost = np.ones((ss.shape[-1]), dtype=np.int64)
     return collected_slices, ss, cost
+
+
+def precreate_set_system_caches():
+    for n in range(2, 100):
+        collected_slices, ss, cost = build_set_system((n, n), samples=None, patience=None, waist=None)
+
+# precreate_set_system_caches() ; exit()
 
 
 n = int(sys.argv[1])
@@ -571,7 +600,7 @@ def tune_mixing_weight():
         lagrangian_to_lower_bound(lagrangian, ss)
 
 
-# print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape, 1) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
+print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape, 1) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
 
 # cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
 

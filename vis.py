@@ -28,6 +28,8 @@ y = g[:, :, 1] / (m - 1) * 2 - 1
 X = x.flatten()
 Y = y.flatten()
 
+# https://stackoverflow.com/a/33966967/383313
+
 P = np.array([X*0+1, X, Y, X**2, X**2*Y, X**2*Y**2, Y**2, X*Y**2, X*Y]).T
 Q = a.flatten()
 print(P.shape, Q.shape)
