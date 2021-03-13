@@ -281,11 +281,22 @@ def collect_lines_on_side(shape, centers):
         total_attempts += attempts
         if j % 100 == 0:
             print(j, "/", len(centers), "total_attempts", total_attempts, "collected", len(ss))
-        if j == 100:
-            exit()
     return np.array(list(ss))
 
 # print(collect_lines_on_side(shape, centers).astype(int)) ; exit()
+
+
+# too slow
+def filter_subsets_naively(lines):
+    dropped = set()
+    N = len(lines)
+    for i in range(N):
+        for j in range(N):
+            if i != j and np.all(lines[i] <= lines[j]):
+                dropped.add(i)
+    kept = set(range(N)).difference(dropped)
+    kept = list(kept)
+    return lines[kept]
 
 
 def exact_collect_lines(shape):
@@ -307,6 +318,10 @@ def exact_collect_lines(shape):
     complete = np.concatenate(complete)
     uniq = np.unique(complete, axis=0)
     print("uniq", uniq.shape)
+
+    # the current naive implementation is too slow.
+    # uniq = filter_subsets_naively(uniq) ; print("subset_filtered", uniq.shape)
+
     return uniq
 
 # exact_lines = exact_collect_lines(shape, centers).astype(int)
@@ -487,7 +502,8 @@ def build_set_system(shape, samples, patience, waist=None):
     return collected_slices, ss, cost
 
 
-shape = 30, 30
+n = int(sys.argv[1])
+shape = n, n
 
 n, m = shape
 samples = 200000
