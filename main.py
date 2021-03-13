@@ -239,12 +239,6 @@ def test_line_through():
 
 # test_line_through() ; exit()
 
-shape = 7, 7
-cutpoints = intersect_all_with_side(shape)
-# print("cutpoints", [tof(c) for c in cutpoints])
-centers = region_centers(cutpoints)
-# print("centers", [tof(c) for c in centers])
-
 
 # ss is mutated
 def lines_through_point(shape, fraction, ss):
@@ -267,7 +261,7 @@ def lines_through_point(shape, fraction, ss):
         assert line[0] * p + line[2] * q == 0
         assert apply(line, p1) * apply(line, p2) < 0
 
-        result = slices(line, shape).astype(int)
+        result = slices(line, shape).astype(np.int32)
         result_tup = tuple(map(tuple, result))
         ss.add(result_tup)
     return ss, attempts
@@ -280,22 +274,24 @@ def lines_through_point(shape, fraction, ss):
 # namely all the sets whose line intersects the (0, 0) (0, n) side.
 # we will get from here to the complete set in collect_lines() by mirroring.
 def collect_lines_on_side(shape, centers):
-    print("collect_lines_on_side() still buggy, seems only to collect downward-sloping lines")
     ss = set()
     total_attempts = 0
     for j, fraction in enumerate(centers):
         ss, attempts = lines_through_point(shape, fraction, ss)
         total_attempts += attempts
-        if j % 1000 == 0:
-            print(total_attempts, len(ss))
+        if j % 100 == 0:
+            print(j, "/", len(centers), "total_attempts", total_attempts, "collected", len(ss))
+        if j == 100:
+            exit()
     return np.array(list(ss))
-
-
 
 # print(collect_lines_on_side(shape, centers).astype(int)) ; exit()
 
 
-def collect_lines(shape, centers):
+def exact_collect_lines(shape):
+    cutpoints = intersect_all_with_side(shape)
+    centers = region_centers(cutpoints)
+
     assert shape[0] == shape[1], "currently only implemented for squares, sorry."
     bitvectors = collect_lines_on_side(shape, centers)
     print("before_mirroring", bitvectors.shape)
@@ -309,27 +305,11 @@ def collect_lines(shape, centers):
                 bvs = np.swapaxes(bvs, 1, 2)
             complete.append(bvs)
     complete = np.concatenate(complete)
-    print(complete.shape)
     uniq = np.unique(complete, axis=0)
     print("uniq", uniq.shape)
     return uniq
 
-    for bv in bitvectors:
-        print(pretty(bv))
-        print()
-    print("====")
-    vert_mirrored = bitvectors[:, ::-1, :]
-    horiz_mirrored = bitvectors[:, :, ::-1]
-    print()
-    print(pretty(horiz_mirrored[0]))
-    collected = np.concatenate([bitvectors, horiz_mirrored])
-    print(collected.shape, "collected.shape")
-    uniq = np.unique(collected, axis=0)
-    print("uniq", uniq.shape)
-    return collected
-
-exact_lines = collect_lines(shape, centers).astype(int)
-print("lines, exact, maybe buggy", exact_lines.shape)
+# exact_lines = exact_collect_lines(shape, centers).astype(int)
 
 
 def random_point_of_rect_boundary(shape):
@@ -405,6 +385,7 @@ def random_line(shape):
     c = (y2-y1)*x1-(x2-x1)*y1
     return a, b, c
 
+
 def parametrized_line(shape, z1, z2):
     x1, y1 = parametrized_point_of_rect_boundary(shape, z1)
     x2, y2 = parametrized_point_of_rect_boundary(shape, z2)
@@ -414,10 +395,8 @@ def parametrized_line(shape, z1, z2):
     return a, b, c
 
 
-# random_line((10, 15)) ; exit()
-
 # do at most samples attempts, but halt prematurely if there's no new find in the last patience attempts.
-def collect_slices(shape, samples, patience):
+def sampling_collect_lines(shape, samples, patience):
     ss = set()
     total_attempts = 0
     attempts = 0
@@ -438,10 +417,7 @@ def collect_slices(shape, samples, patience):
             break
         if total_attempts % 1000 == 0:
             print(total_attempts, attempts, len(ss))
-    return ss
-
-sampled_lines = np.array(list(collect_slices(shape, 50000, 10000))).astype(int)
-print("lines, sampled", len(sampled_lines))
+    return np.array(list(ss)).astype(np.uint8)
 
 
 def totuple(a):
@@ -451,13 +427,7 @@ def totuple(a):
         return a
 
 
-sampled_lines_set = set(totuple(sampled_lines))
-exact_lines_set = set(totuple(exact_lines))
-print("diff", sampled_lines_set.difference(exact_lines_set))
-
-exit()
-
-def parametrized_collect_slices(shape, granularity):
+def parametrized_collect_lines(shape, granularity):
     ss = set()
     zs = np.linspace(0, (n + m) * 2, granularity)
     total_attempts = 0
@@ -497,8 +467,9 @@ def build_set_system(shape, samples, patience, waist=None):
         collected_slices = np.load(f)
         print("took set system from cache %s" % filename)
     except OSError:
-        cs = collect_slices(shape, samples=samples, patience=patience)
-        # cs = parametrized_collect_slices(shape, granularity=1000)
+        cs = exact_collect_lines(shape)
+        # cs = sampling_collect_lines(shape, samples=samples, patience=patience)
+        # cs = parametrized_collect_lines(shape, granularity=1000)
         collected_slices = np.array(list(cs))
         np.save(open("%d-%d.npy" % shape, "wb"), collected_slices)
 
@@ -516,8 +487,7 @@ def build_set_system(shape, samples, patience, waist=None):
     return collected_slices, ss, cost
 
 
-shape = 12, 12
-
+shape = 30, 30
 
 n, m = shape
 samples = 200000
@@ -587,13 +557,13 @@ def tune_mixing_weight():
 
 # print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape, 1) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
 
-cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
-
+# cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
 
 
 g = setcover.SetCover(ss, cost, maxiters=maxiters)
 print("starting set cover solver")
 solution, time_used = g.SolveSCP()
+
 bitvec = g.s
 solution = collected_slices[bitvec, :].reshape((-1, n, m))
 agg = np.zeros((n, m), dtype=int)
@@ -604,7 +574,6 @@ for i, s in enumerate(solution):
 
 print("aggregate")
 print(agg)
-
 
 lagrangian = np.array(g.u).reshape((n, m))
 np.save(open("lagrangian.%d-%d.npy" % shape, "wb"), lagrangian)
