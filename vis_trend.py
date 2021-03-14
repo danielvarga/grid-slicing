@@ -7,9 +7,8 @@ from functools import cmp_to_key
 import matplotlib.pyplot as plt
 
 sizes = []
-for n in range(2, 28):
-    a = np.load("%d-%d.npy" % (n, n))
-    print(a.dtype) ; exit()
+for n in range(2, 31):
+    a = np.load("set-systems/%d-%d.npy" % (n, n))
     sizes.append((n, len(a)))
 
 sizes = np.array(sizes)

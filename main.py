@@ -487,7 +487,6 @@ def parametrized_collect_lines(shape, granularity):
 # nr_of_lines=2 (-1, +1)
 # nr_of_lines=3  (-2, 0, 2)
 def create_waist(shape, nr_of_lines):
-    waist_slices = []
     agg = np.zeros(shape, dtype=int)
     for c in range(-nr_of_lines+1, nr_of_lines, 2):
         line = (1, -1, c - 0.5)
@@ -495,6 +494,23 @@ def create_waist(shape, nr_of_lines):
         # print(pretty(s))
         agg += s.astype(int)
     return agg
+
+
+def create_irregular_waist(shape):
+
+    # this works for n=11, found a 10-line solution in 100 niters.
+    waist_lines = [(1.0, -1.1, -0.7), (1.0, -1.1, 1.4), (1.0, -1.1, -2.8), (1.0, -1.1, 3.48)]
+
+    # tried this for n=12, but it didn't work.
+    # waist_lines = [(1.0, -1.1, -0.7), (1.0, -1.1, 1.4), (1.0, -1.1, -2.8), (1.0, -1.1, 3.45), (1.0, -1.1, -4.85), (1.0, -1.1, -5.7)]
+    # waist_lines = [(1.0, -1.1, -0.7), (1.0, -1.1, 1.4), (1.0, -1.1, -2.8), (1.0, -1.1, 3.45), (1.0, -1.1, -4.87)]
+
+    agg = np.zeros(shape, dtype=int)
+    for line in waist_lines:
+        s = slices(line, shape)
+        print(pretty(s))
+        agg += s.astype(int)
+    return (agg > 0).astype(int), len(waist_lines)
 
 
 def build_set_system(shape, samples, patience, waist=None):
@@ -541,13 +557,14 @@ maxiters = 200 # unlike the upper bound which needs luck, the lower bound normal
 
 # unfortunately it seem like even nr_of_waist_lines=2 (that is, forcing the two middle diagonals into the cover)
 # prevents the optimizer from finding an n-1 solution, probably because it does not even exist with this restriction.
-do_waist_hack = False
+do_waist_hack = True
 if do_waist_hack:
-    nr_of_waist_lines = 2
+    # nr_of_waist_lines = 6 ; waist = create_waist(shape, nr_of_waist_lines)
+    waist, nr_of_waist_lines = create_irregular_waist(shape)
+    print(pretty(waist))
     print("adding a single set to the system that is worth %d lines" % nr_of_waist_lines)
     print("please add %d to the upper bound manually" % (nr_of_waist_lines - 1))
-    waist = create_waist(shape, nr_of_waist_lines)
-    print(pretty(waist))
+    print("elements covered by waist:", waist.sum())
 else:
     waist = None
 
