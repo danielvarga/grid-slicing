@@ -359,7 +359,7 @@ def parametrized_point_of_rect_boundary(shape, z_orig):
         x = 0
         y = z
     else:
-        x = z
+        x = n - z
         y = 0
     if center_mirror:
         x = n - x
@@ -373,7 +373,7 @@ def test_parametrized_point():
     zs = np.linspace(0, (n + m) * 2, 500)
     points = [parametrized_point_of_rect_boundary(shape, z) for z in zs]
     points = np.array(points)
-    plt.scatter(points[:, 0], points[:, 1], c=zs)
+    plt.scatter(points[:, 0], points[:, 1], c=zs, s=zs)
     plt.show()
 
 # test_parametrized_point() ; exit()
@@ -428,7 +428,7 @@ def visualize_partition(shape, granularity):
     plt.yticks([])
     plt.savefig("mobius.%d-%d.png" % shape)
 
-# visualize_partition(shape=(5, 5), granularity=1000) ; exit()
+visualize_partition(shape=(5, 5), granularity=3000) ; exit()
 
 
 # do at most samples attempts, but halt prematurely if there's no new find in the last patience attempts.
@@ -484,6 +484,39 @@ def parametrized_collect_lines(shape, granularity):
     return ss
 
 
+# pick endpoint 1 from ((0, 0), (0, n * ratio))
+# pick endpoint 2 from ((n, n), (n * (1-ratio), n)
+def parametrized_collect_diagonal_lines(shape, ratio, granularity=1000):
+    ss = set()
+    n, m = shape
+    assert n == m
+    total_attempts = 0
+    # parametrized_point_of_rect_boundary(shape, z_orig)
+    z1s = np.linspace(0, n * ratio, granularity)
+    z2s = 3 * n + z1s
+    for i1, z1 in enumerate(z1s):
+        for i2, z2 in enumerate(z2s):
+            total_attempts += 1
+            line = parametrized_line(shape, z1, z2)
+            result = slices(line, shape)
+
+            if np.sum(result.astype(int)) >= 1:
+                result_tup = tuple(map(tuple, result))
+                before = len(ss)
+                ss.add(result_tup)
+                if len(ss) > before:
+                    print(pretty(result))
+                    print()
+            if total_attempts % 10000 == 0:
+                print(total_attempts, len(ss))
+    return ss
+
+
+n = int(sys.argv[1])
+shape = n, n
+parametrized_collect_diagonal_lines(shape, ratio=0.5, granularity=10) ; exit()
+
+
 # nr_of_lines=2 (-1, +1)
 # nr_of_lines=3  (-2, 0, 2)
 def create_waist(shape, nr_of_lines):
@@ -520,7 +553,8 @@ def build_set_system(shape, samples, patience, waist=None):
         collected_slices = np.load(f)
         print("took set system from cache %s" % filename)
     except OSError:
-        cs = exact_collect_lines(shape)
+        # cs = exact_collect_lines(shape)
+        cs = parametrized_collect_diagonal_lines(shape, granularity=1000)
         # cs = sampling_collect_lines(shape, samples=samples, patience=patience)
         # cs = parametrized_collect_lines(shape, granularity=1000)
         collected_slices = np.array(list(cs))
