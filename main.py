@@ -492,9 +492,10 @@ def sampling_collect_diagonal_lines(shape, samples):
     assert n == m
     total_attempts = 0
     for i in range(samples):
-        # this worked for n=11, 12.
-        # (found n=12 nontrivial solution in 750 maxiters, 33 mins,
-        # found n=11 nontrivial solution in 500 maxiters, 9 mins.)
+        # this worked for n=11, 12. did not work for n=13.
+        # found n=11 nontrivial solution in 500 maxiters, 9 mins. on spernerized set system.
+        # found n=12 nontrivial solution in 750 maxiters, 33 mins. on spernerized set system.
+        # have not found n=13 nontrivial solution in 10000 maxiters, 300 mins. no spernerization there
         z1 = np.random.uniform(low=n * 0.4, high=n + n * 0.1)
         z2 = 4 * n - z1 + np.random.uniform(low=-n * 0.2, high=n * 0.2)
 
@@ -528,12 +529,33 @@ def sampling_collect_diagonal_lines(shape, samples):
     uniq = np.unique(complete, axis=0)
     print("after unique", len(uniq))
     print(uniq.sum(axis=0))
+    do_spernerization = False
+    if do_spernerization:
+        uniq = spernerize(uniq)
+        print("after spernerization", len(uniq))
     return uniq
 
 
 # n = int(sys.argv[1])
 # shape = n, n
 # ss = parametrized_collect_diagonal_lines(shape, ratio=0.6, samples=100000) ; print(n, len(ss)) ; exit()
+
+
+# https://stackoverflow.com/a/14107790/383313
+def spernerize(set_system):
+    shape = set_system.shape
+    ss = set_system.reshape((len(set_system), -1))
+    kept = []
+    for line in ss:
+        elements = line.nonzero()[0]
+        # intersection of all columns corresponding to the elements of row 'line'
+        summary = np.min(ss[:, elements], axis=1)
+        # 'line' is by definition an element of this intersection.
+        # if there are more, line is not kept.
+        if summary.sum() == 1:
+            kept.append(line)
+    kept = np.array(kept).reshape((-1, shape[1], shape[2]))
+    return kept
 
 
 # nr_of_lines=2 (-1, +1)
@@ -620,9 +642,9 @@ n = int(sys.argv[1])
 shape = n, n
 
 n, m = shape
-samples = 400000
+samples = 1000000
 patience = 10000
-maxiters = 5000 # unlike the upper bound which needs luck, the lower bound normally converges after maxiters=2.
+maxiters = 10000 # unlike the upper bound which needs luck, the lower bound normally converges after maxiters=2.
 
 # unfortunately it seem like even nr_of_waist_lines=2 (that is, forcing the two middle diagonals into the cover)
 # prevents the optimizer from finding an n-1 solution, probably because it does not even exist with this restriction.
