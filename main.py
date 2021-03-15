@@ -486,23 +486,17 @@ def parametrized_collect_lines(shape, granularity):
 
 # pick endpoint 1 from ((0, 0), (0, n * ratio))
 # pick endpoint 2 from ((n, n), (n * (1-ratio), n)
-def sampling_collect_diagonal_lines(shape, ratio, samples):
+def sampling_collect_diagonal_lines(shape, samples):
     ss = set()
     n, m = shape
     assert n == m
     total_attempts = 0
     for i in range(samples):
-        # ratio = 0.6 does not work
-        # z1 = np.random.uniform(low=0, high=n * ratio)
-        # z2 = 2 * n - np.random.uniform(low=0, high=n * ratio)
-
-        # ratio = 0.1 works
-        z1 = np.random.uniform(low=0, high=n + n * ratio)
-        z2 = 4 * n - np.random.uniform(low=0, high=n + n * ratio)
-
-        # ratio = 0.1 does not work
-        # z1 = np.random.uniform(low=n * 0.4, high=n + n * ratio)
-        # z2 = 4 * n - np.random.uniform(low=n * 0.4, high=n + n * ratio)
+        # this worked for n=11, 12.
+        # (found n=12 nontrivial solution in 750 maxiters, 33 mins,
+        # found n=11 nontrivial solution in 500 maxiters, 9 mins.)
+        z1 = np.random.uniform(low=n * 0.4, high=n + n * 0.1)
+        z2 = 4 * n - z1 + np.random.uniform(low=-n * 0.2, high=n * 0.2)
 
         total_attempts += 1
         line = parametrized_line(shape, z1, z2)
@@ -579,7 +573,7 @@ def build_set_system(shape, samples, patience, waist=None):
         print("took set system from cache %s" % filename)
     except OSError:
         # cs = exact_collect_lines(shape)
-        cs = sampling_collect_diagonal_lines(shape, ratio=0.2, samples=samples)
+        cs = sampling_collect_diagonal_lines(shape, samples=samples)
         # cs = sampling_collect_lines(shape, samples=samples, patience=patience)
         # cs = parametrized_collect_lines(shape, granularity=1000)
         collected_slices = np.array(list(cs))
