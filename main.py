@@ -713,28 +713,66 @@ print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagra
 # cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
 
 
-g = setcover.SetCover(ss, cost, maxiters=maxiters)
-print("starting set cover solver")
-solution, time_used = g.SolveSCP()
+def to_setcoverpy_input(collected_slices):
+    ss = collected_slices
+    ss = ss.reshape((len(ss), -1)) # flatten the nxm grids to n*m vectors
+    ss = ss.T
+    # now ss.shape == (number of points, number of sets).
+    cost = np.ones((ss.shape[-1]), dtype=np.int64)
+    return ss, cost
 
-bitvec = g.s
-solution = collected_slices[bitvec, :].reshape((-1, n, m))
-np.save(open("solution.%d-%d.npy" % shape, "wb"), solution)
+def main_batch(collected_slices, maxiters):
+    shape = collected_slices.shape[1:]
+    n, m = shape
+    assert n == m
+    ss, cost = to_setcoverpy_input(collected_slices)
+    found = 0
+    for i in range(10000):
+        g = setcover.SetCover(ss, cost, maxiters=maxiters)
+        solution, time_used = g.SolveSCP()
+        bitvec = g.s
+        solution = collected_slices[bitvec, :]
+        if len(solution) < n: # nontrivial solution
+            found += 1
+            filename = "solution.%d.%05d.npy" % (n, abs(hash(totuple(solution))) % 100000)
+            print("found %s. nontrivial solution, saving it to %s" % (found + 1, filename))
+            with open(filename, "wb") as f:
+                np.save(f, solution)
+        print("%d. set cover restart, %d solutions so far." % (i, found))
 
-agg = np.zeros((n, m), dtype=int)
-for i, s in enumerate(solution):
-    print(i)
-    print(pretty(s))
-    agg += s.astype(int)
+main_batch(collected_slices, maxiters=100) ; exit()
 
-print("aggregate")
-print(agg)
 
-lagrangian = np.array(g.u).reshape((n, m))
-np.save(open("lagrangian.%d-%d.npy" % shape, "wb"), lagrangian)
-plt.imshow(lagrangian)
-plt.savefig("vis.png")
-plt.clf()
+def main_interactive(collected_slices, maxiters):
+    shape = collected_slices.shape[1:]
+    n, m = shape
+    ss, cost = to_setcoverpy_input(collected_slices)
 
-# plt.hist(lagrangian.flatten().dot(ss.astype(int)), bins=30)
-# plt.show()
+    g = setcover.SetCover(ss, cost, maxiters=maxiters)
+    print("starting set cover solver")
+    solution, time_used = g.SolveSCP()
+
+    bitvec = g.s
+    solution = collected_slices[bitvec, :].reshape((-1, n, m))
+    np.save(open("solution.%d-%d.npy" % shape, "wb"), solution)
+
+    agg = np.zeros((n, m), dtype=int)
+    for i, s in enumerate(solution):
+        print(i)
+        print(pretty(s))
+        agg += s.astype(int)
+
+    print("aggregate")
+    print(agg)
+
+    lagrangian = np.array(g.u).reshape((n, m))
+    np.save(open("lagrangian.%d-%d.npy" % shape, "wb"), lagrangian)
+    plt.imshow(lagrangian)
+    plt.savefig("vis.png")
+    plt.clf()
+
+    # plt.hist(lagrangian.flatten().dot(ss.astype(int)), bins=30)
+    # plt.show()
+
+
+main_interactive(collected_slices, maxiters)
