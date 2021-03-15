@@ -428,7 +428,7 @@ def visualize_partition(shape, granularity):
     plt.yticks([])
     plt.savefig("mobius.%d-%d.png" % shape)
 
-visualize_partition(shape=(5, 5), granularity=3000) ; exit()
+# visualize_partition(shape=(5, 5), granularity=1000) ; exit()
 
 
 # do at most samples attempts, but halt prematurely if there's no new find in the last patience attempts.
@@ -486,35 +486,59 @@ def parametrized_collect_lines(shape, granularity):
 
 # pick endpoint 1 from ((0, 0), (0, n * ratio))
 # pick endpoint 2 from ((n, n), (n * (1-ratio), n)
-def parametrized_collect_diagonal_lines(shape, ratio, granularity=1000):
+def sampling_collect_diagonal_lines(shape, ratio, samples):
     ss = set()
     n, m = shape
     assert n == m
     total_attempts = 0
-    # parametrized_point_of_rect_boundary(shape, z_orig)
-    z1s = np.linspace(0, n * ratio, granularity)
-    z2s = 3 * n + z1s
-    for i1, z1 in enumerate(z1s):
-        for i2, z2 in enumerate(z2s):
-            total_attempts += 1
-            line = parametrized_line(shape, z1, z2)
-            result = slices(line, shape)
+    for i in range(samples):
+        # ratio = 0.6 does not work
+        # z1 = np.random.uniform(low=0, high=n * ratio)
+        # z2 = 2 * n - np.random.uniform(low=0, high=n * ratio)
 
-            if np.sum(result.astype(int)) >= 1:
-                result_tup = tuple(map(tuple, result))
-                before = len(ss)
-                ss.add(result_tup)
-                if len(ss) > before:
-                    print(pretty(result))
-                    print()
-            if total_attempts % 10000 == 0:
-                print(total_attempts, len(ss))
-    return ss
+        # ratio = 0.1 works
+        # z1 = np.random.uniform(low=0, high=n + n * ratio)
+        # z2 = 4 * n - np.random.uniform(low=0, high=n + n * ratio)
+
+        z1 = np.random.uniform(low=n * 0.4, high=n + n * ratio)
+        z2 = 4 * n - np.random.uniform(low=n * 0.4, high=n + n * ratio)
+
+        total_attempts += 1
+        line = parametrized_line(shape, z1, z2)
+        result = slices(line, shape)
+
+        if np.sum(result.astype(int)) >= 1:
+            result_tup = tuple(map(tuple, result))
+            before = len(ss)
+            ss.add(result_tup)
+            if len(ss) > before:
+                pass
+                # print(pretty(result)) ; print()
+        if total_attempts % 10000 == 0:
+            print(total_attempts, len(ss))
+
+    ss = np.array(list(ss))
+    complete = []
+    print("before mirroring", len(ss))
+    for flip_horiz in (False, True):
+        for flip_vert in (False, True):
+            bvs = ss
+            if flip_horiz:
+                bvs = bvs[:, :, ::-1]
+            if flip_vert:
+                bvs = bvs[:, ::-1, :]
+            complete.append(bvs)
+    complete = np.concatenate(complete)
+    print("after mirroring", len(complete))
+    uniq = np.unique(complete, axis=0)
+    print("after unique", len(uniq))
+    print(uniq.sum(axis=0))
+    return uniq
 
 
-n = int(sys.argv[1])
-shape = n, n
-parametrized_collect_diagonal_lines(shape, ratio=0.5, granularity=10) ; exit()
+# n = int(sys.argv[1])
+# shape = n, n
+# ss = parametrized_collect_diagonal_lines(shape, ratio=0.6, samples=100000) ; print(n, len(ss)) ; exit()
 
 
 # nr_of_lines=2 (-1, +1)
@@ -554,7 +578,7 @@ def build_set_system(shape, samples, patience, waist=None):
         print("took set system from cache %s" % filename)
     except OSError:
         # cs = exact_collect_lines(shape)
-        cs = parametrized_collect_diagonal_lines(shape, granularity=1000)
+        cs = sampling_collect_diagonal_lines(shape, ratio=0.2, samples=200000)
         # cs = sampling_collect_lines(shape, samples=samples, patience=patience)
         # cs = parametrized_collect_lines(shape, granularity=1000)
         collected_slices = np.array(list(cs))
@@ -581,6 +605,25 @@ def precreate_set_system_caches():
 # precreate_set_system_caches() ; exit()
 
 
+def visualize_solution(ss):
+    ss =  np.array(ss)
+    ss_size, n, m = ss.shape
+    d = 100
+    N, M = d * n + 1, d * m + 1
+    from PIL import Image, ImageDraw
+    
+    im = Image.new('RGB', (N, M), color='white')
+    draw = ImageDraw.Draw(im)
+    for i in range(n + 1):
+        draw.line((i * d, 0, i * d, M), fill='blue')
+    for i in range(m + 1):
+        draw.line((0, i * d, N, i * d), fill='blue')
+    im.save("img.png")
+
+visualize_solution(np.zeros((3,3,3))) ; exit()
+
+
+
 n = int(sys.argv[1])
 shape = n, n
 
@@ -591,7 +634,7 @@ maxiters = 200 # unlike the upper bound which needs luck, the lower bound normal
 
 # unfortunately it seem like even nr_of_waist_lines=2 (that is, forcing the two middle diagonals into the cover)
 # prevents the optimizer from finding an n-1 solution, probably because it does not even exist with this restriction.
-do_waist_hack = True
+do_waist_hack = False
 if do_waist_hack:
     # nr_of_waist_lines = 6 ; waist = create_waist(shape, nr_of_waist_lines)
     waist, nr_of_waist_lines = create_irregular_waist(shape)
