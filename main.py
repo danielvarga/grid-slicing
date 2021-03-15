@@ -497,11 +497,12 @@ def sampling_collect_diagonal_lines(shape, ratio, samples):
         # z2 = 2 * n - np.random.uniform(low=0, high=n * ratio)
 
         # ratio = 0.1 works
-        # z1 = np.random.uniform(low=0, high=n + n * ratio)
-        # z2 = 4 * n - np.random.uniform(low=0, high=n + n * ratio)
+        z1 = np.random.uniform(low=0, high=n + n * ratio)
+        z2 = 4 * n - np.random.uniform(low=0, high=n + n * ratio)
 
-        z1 = np.random.uniform(low=n * 0.4, high=n + n * ratio)
-        z2 = 4 * n - np.random.uniform(low=n * 0.4, high=n + n * ratio)
+        # ratio = 0.1 does not work
+        # z1 = np.random.uniform(low=n * 0.4, high=n + n * ratio)
+        # z2 = 4 * n - np.random.uniform(low=n * 0.4, high=n + n * ratio)
 
         total_attempts += 1
         line = parametrized_line(shape, z1, z2)
@@ -578,7 +579,7 @@ def build_set_system(shape, samples, patience, waist=None):
         print("took set system from cache %s" % filename)
     except OSError:
         # cs = exact_collect_lines(shape)
-        cs = sampling_collect_diagonal_lines(shape, ratio=0.2, samples=200000)
+        cs = sampling_collect_diagonal_lines(shape, ratio=0.2, samples=samples)
         # cs = sampling_collect_lines(shape, samples=samples, patience=patience)
         # cs = parametrized_collect_lines(shape, granularity=1000)
         collected_slices = np.array(list(cs))
@@ -620,17 +621,14 @@ def visualize_solution(ss):
         draw.line((0, i * d, N, i * d), fill='blue')
     im.save("img.png")
 
-visualize_solution(np.zeros((3,3,3))) ; exit()
-
-
 
 n = int(sys.argv[1])
 shape = n, n
 
 n, m = shape
-samples = 200000
+samples = 400000
 patience = 10000
-maxiters = 200 # unlike the upper bound which needs luck, the lower bound normally converges after maxiters=2.
+maxiters = 5000 # unlike the upper bound which needs luck, the lower bound normally converges after maxiters=2.
 
 # unfortunately it seem like even nr_of_waist_lines=2 (that is, forcing the two middle diagonals into the cover)
 # prevents the optimizer from finding an n-1 solution, probably because it does not even exist with this restriction.
@@ -705,10 +703,12 @@ solution, time_used = g.SolveSCP()
 
 bitvec = g.s
 solution = collected_slices[bitvec, :].reshape((-1, n, m))
+np.save(open("solution.%d-%d.npy" % shape, "wb"), solution)
+
 agg = np.zeros((n, m), dtype=int)
 for i, s in enumerate(solution):
-    # print(i)
-    # print(pretty(s))
+    print(i)
+    print(pretty(s))
     agg += s.astype(int)
 
 print("aggregate")
@@ -720,5 +720,5 @@ plt.imshow(lagrangian)
 plt.savefig("vis.png")
 plt.clf()
 
-plt.hist(lagrangian.flatten().dot(ss.astype(int)), bins=30)
-plt.show()
+# plt.hist(lagrangian.flatten().dot(ss.astype(int)), bins=30)
+# plt.show()
