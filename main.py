@@ -415,10 +415,10 @@ def create_diagonal_cover_attempt(shape):
     A, B, C, D = 0, n, 2*n, 3*n
     z_pairs = (
         (A+1.5, B+11.8),
-        (A+3.5, B+10.4),
+        (A+3.5, B+9.4),
         (D+11.2, C+1.7),
-        (D+9, C+3.7),
-        (A+5.7, D+6.5),
+        (D+9.5, C+3.7),
+        (A+6.1, D+6.5),
         (A+8.8, D+4.5),
         (A+10.8, D+2.7),
         (B+0.7, D+0.3),
@@ -433,7 +433,7 @@ def create_diagonal_cover_attempt(shape):
         result = slices(line, shape)
         ss.append(result)
         print(z1, z2)
-        print(result)
+        # print(result)
         agg += result
         # p1 = parametrized_point_of_rect_boundary(shape, z1)
         # p2 = parametrized_point_of_rect_boundary(shape, z2)
