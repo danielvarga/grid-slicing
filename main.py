@@ -209,7 +209,6 @@ def line_through(fraction, point):
 
 
 # line connecting (fraction, 0) and (point1+point2)/2
-# todo temporarily assuming that half-integer arithmetic is precise.
 def line_between(fraction, point1, point2):
     p, q = fraction # interpreted as point (p/q, 0)
     X, Y = (point1[0] + point2[0], point1[1] + point2[1])
@@ -286,19 +285,6 @@ def collect_lines_on_side(shape, centers):
 # print(collect_lines_on_side(shape, centers).astype(int)) ; exit()
 
 
-# too slow
-def filter_subsets_naively(lines):
-    dropped = set()
-    N = len(lines)
-    for i in range(N):
-        for j in range(N):
-            if i != j and np.all(lines[i] <= lines[j]):
-                dropped.add(i)
-    kept = set(range(N)).difference(dropped)
-    kept = list(kept)
-    return lines[kept]
-
-
 def exact_collect_lines(shape):
     cutpoints = intersect_all_with_side(shape)
     centers = region_centers(cutpoints)
@@ -320,7 +306,7 @@ def exact_collect_lines(shape):
     print("uniq", uniq.shape)
 
     # the current naive implementation is too slow.
-    # uniq = filter_subsets_naively(uniq) ; print("subset_filtered", uniq.shape)
+    # uniq = spernerize(uniq) ; print("subset_filtered", uniq.shape)
 
     return uniq
 
@@ -406,6 +392,64 @@ def parametrized_line(shape, z1, z2):
     c = (y2-y1)*x1-(x2-x1)*y1
     return a, b, c
 
+
+def pp(l):
+    return str(list(l)).replace('[]', '.').replace('[', '').replace(']', '').replace(' ', '')
+
+
+def compact_print(ss):
+    grid = ss.transpose((1, 2, 0))
+    n, m, s = grid.shape
+    for i in range(n):
+        for j in range(m):
+            print(pp(grid[j, i].nonzero()[0]), "\t", end='')
+        print()
+
+
+def create_diagonal_cover_attempt(shape):
+    n, m = shape
+    assert n == m
+    # two close-to-1 slope lines, close to the diagonal,
+    # and n-1-2 close-to-minus-1 slope lines, arranged somewhat regularly.
+    assert n == 12
+    A, B, C, D = 0, n, 2*n, 3*n
+    z_pairs = (
+        (A+1.5, B+11.8),
+        (A+3.5, B+10.4),
+        (D+11.2, C+1.7),
+        (D+9, C+3.7),
+        (A+5.7, D+6.5),
+        (A+8.8, D+4.5),
+        (A+10.8, D+2.7),
+        (B+0.7, D+0.3),
+        (B+2.7, C+10.3),
+        (B+4.7, C+8.3),
+        (B+6.7, C+6.3),
+    )
+    agg = np.zeros((n, n))
+    ss = []
+    for z1, z2 in z_pairs:
+        line = parametrized_line(shape, z1, z2)
+        result = slices(line, shape)
+        ss.append(result)
+        print(z1, z2)
+        print(result)
+        agg += result
+        # p1 = parametrized_point_of_rect_boundary(shape, z1)
+        # p2 = parametrized_point_of_rect_boundary(shape, z2)
+    print("agg")
+    print(agg)
+    ss = np.array(ss)
+    compact_print(ss)
+
+
+
+create_diagonal_cover_attempt((12, 12)) ; exit()
+
+
+def search_for_diagonal_covers(shape):
+    while True:
+        create_diagonal_cover_attempt(shape)
 
 
 def visualize_partition(shape, granularity):
