@@ -1,6 +1,6 @@
-n=12
+n=13
 for ((i=0; i<6; ++i))
 do
-    python main.py $n > cout.$i &
+    nohup python main.py $n > cout.$n.$i &
     echo started process $i
 done
