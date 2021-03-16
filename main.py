@@ -426,18 +426,34 @@ def create_diagonal_cover_attempt(shape):
         (B+4.7, C+8.3),
         (B+6.7, C+6.3),
     )
-    agg = np.zeros((n, n))
-    ss = []
+    lines = []
     for z1, z2 in z_pairs:
         line = parametrized_line(shape, z1, z2)
+        lines.append(line)
+
+    sl1 = -1.1
+    sl2 = - 1 / sl1
+    lines_2par = ( # 2 par as in 2 params as in (slope, intercept)
+        (sl1, 9.4),
+        (sl1, 11.8),
+        (sl1, 13.84),
+        (sl1, 16.2),
+        (sl2, -3.8),
+        (sl2, -2.7),
+        (sl2, -1.3),
+        (sl2, 0.7),
+        (sl2, 2.7),
+        (sl2, 4.7),
+        (sl2, 6.7),
+    )
+
+    agg = np.zeros((n, n))
+    ss = []
+    for line in lines:
         print("slope", - line[0] / line[1], "intercept", - line[2] / line[1])
         result = slices(line, shape)
         ss.append(result)
-        print(z1, z2)
-        # print(result)
         agg += result
-        # p1 = parametrized_point_of_rect_boundary(shape, z1)
-        # p2 = parametrized_point_of_rect_boundary(shape, z2)
     print("agg")
     print(agg)
     ss = np.array(ss)
