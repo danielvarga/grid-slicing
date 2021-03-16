@@ -402,7 +402,7 @@ def compact_print(ss):
     n, m, s = grid.shape
     for i in range(n):
         for j in range(m):
-            print(pp(grid[j, i].nonzero()[0]), "\t", end='')
+            print(pp(grid[i, j].nonzero()[0]), "\t", end='')
         print()
 
 
@@ -418,7 +418,7 @@ def create_diagonal_cover_attempt(shape):
         (A+3.5, B+9.4),
         (D+11.2, C+1.7),
         (D+9.5, C+3.7),
-        (A+6.1, D+6.5),
+        (A+7.1, D+6.5),
         (A+8.8, D+4.5),
         (A+10.8, D+2.7),
         (B+0.7, D+0.3),
@@ -430,6 +430,7 @@ def create_diagonal_cover_attempt(shape):
     ss = []
     for z1, z2 in z_pairs:
         line = parametrized_line(shape, z1, z2)
+        print("slope", - line[0] / line[1], "intercept", - line[2] / line[1])
         result = slices(line, shape)
         ss.append(result)
         print(z1, z2)

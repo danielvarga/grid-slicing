@@ -102,7 +102,7 @@ def compact_print(ss):
     n, m, s = grid.shape
     for i in range(n):
         for j in range(m):
-            print(pp(grid[j, i].nonzero()[0]), "\t", end='')
+            print(pp(grid[i, j].nonzero()[0]), "\t", end='')
         print()
 
 ss1 = ss.copy()
