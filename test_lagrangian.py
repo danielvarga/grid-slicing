@@ -2,11 +2,6 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-n = int(sys.argv[1])
-m = n
-shape = n, m
-
-
 def parametrized_point_of_rect_boundary(shape, z_orig):
     z = z_orig
     n, m = shape
@@ -46,7 +41,7 @@ def parametrized_line_on_opposite(shape, y1, y2, opposite):
     if opposite:
         z2 = 3 * n - (y2 + 1) / 2 * n
     else:
-        z2 = 2 * n + (y2 + 1) / 2 * n
+        z2 = n + (y2 + 1) / 2 * n
     return parametrized_line(shape, z1, z2)
 
 
@@ -127,6 +122,11 @@ def vis_empirical(shape, lag, samples, opposite):
             line = parametrized_line_on_opposite(shape, y1, y2, opposite=opposite)
             result = slices(line, shape).astype(int)
             estimate[i1, i2] = (result * lag).sum() / n
+
+    # this is the cheapest way to sync the orientation of the analytical and the empirical
+    if not opposite:
+        estimate = estimate[::-1, :]
+
     plt.imshow(estimate, vmin=0.0, vmax=0.7)
     plt.show()
 
@@ -138,6 +138,10 @@ def compare_analytical_and_empirical_surfaces(shape):
     vis_quadratic(99, opposite=False)
     vis_empirical(shape, lag, samples=99, opposite=False)
 
+
+n = int(sys.argv[1])
+m = n
+shape = n, m
 
 compare_analytical_and_empirical_surfaces(shape) ; exit()
 
