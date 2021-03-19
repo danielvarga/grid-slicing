@@ -431,21 +431,30 @@ def create_diagonal_cover_attempt(shape):
         line = parametrized_line(shape, z1, z2)
         lines.append(line)
 
-    sl1 = -1.1
-    sl2 = - 1 / sl1
+    k = 4
+    descending = [(-1, intercept) for intercept in np.arange(k) * 2 + 9 + 0.5]
+    ascending = [(1, intercept) for intercept in np.arange(n - k - 1) * 2 - 6 + 0.5]
+    lines_2par = descending + ascending
+    '''
+    # this leaves out only a single cell
+    sl1 = -1.0
+    sl2 = +1.0
     lines_2par = ( # 2 par as in 2 params as in (slope, intercept)
-        (sl1, 9.4),
-        (sl1, 11.8),
-        (sl1, 13.84),
-        (sl1, 16.2),
-        (sl2, -3.8),
-        (sl2, -2.7),
-        (sl2, -1.3),
-        (sl2, 0.7),
-        (sl2, 2.7),
-        (sl2, 4.7),
-        (sl2, 6.7),
+        (sl1, 9.5),
+        (sl1, 11.5),
+        (sl1, 13.5),
+        (sl1, 15.5),
+
+        (sl2, -5.5),
+        (sl2, -3.5),
+        (sl2, -1.5),
+        (sl2, 0.5),
+        (sl2, 2.5),
+        (sl2, 4.5),
+        (sl2, 6.5),
     )
+    '''
+    lines = tuple((-si[0], 1, -si[1]) for si in lines_2par)
 
     agg = np.zeros((n, n))
     ss = []
@@ -460,13 +469,89 @@ def create_diagonal_cover_attempt(shape):
     compact_print(ss)
 
 
+# create_diagonal_cover_attempt((12, 12)) ; exit()
 
-create_diagonal_cover_attempt((12, 12)) ; exit()
+
+def create_almost_diagonal_cover_attempt(shape):
+    n, m = shape
+    assert n == m
+    # two close-to-1 slope lines, close to the diagonal,
+    # and n-1-2 close-to-minus-1 slope lines, arranged somewhat regularly.
+    assert n == 14
+    A, B, C, D = 0, n, 2*n, 3*n
+    z_pairs = [
+        (B+1.75, D-0.9), (B-0.9, D+1.25),
+    ]
+    # z_pairs += zip(B + np.linspace(5.1, 16.4, 6), B - np.linspace(3.1, 13.1, 6))
+    # z_pairs += zip(D + np.linspace(5.1, 14.4, 5), D - np.linspace(3.1, 11.1, 5))
+    z_pairs += zip(B + np.linspace(5.2, 16.2, 6), B - np.linspace(3.1, 14.1, 6))
+    z_pairs += zip(D + np.linspace(5.2, 15.2, 5), D - np.linspace(3.1, 13.1, 5))
+
+    z_pairs = np.array(z_pairs)
+
+    do_search = True
+    if do_search:
+        scale = float(sys.argv[1])
+        for _ in range(10000):
+            z_pairs_perturbed = z_pairs.copy()
+            z_pairs_perturbed[2:] += np.random.normal(size=z_pairs_perturbed[2:].shape, scale=scale)
+            lines = [parametrized_line(shape, z1, z2) for z1, z2 in z_pairs_perturbed]
+            agg = np.zeros((n, n))
+            for line in lines:
+                result = slices(line, shape)
+                agg += result
+            print((agg == 0).astype(int).sum())
+        return
+
+    lines = []
+    for z1, z2 in z_pairs:
+        line = parametrized_line(shape, z1, z2)
+        lines.append(line)
+
+    agg = np.zeros((n, n))
+    ss = []
+    for line in lines:
+        print("slope", - line[0] / line[1], "intercept", - line[2] / line[1])
+        result = slices(line, shape)
+        print(result.astype(int))
+        ss.append(result)
+        agg += result
+    print("agg")
+    print(agg)
+    ss = np.array(ss)
+    compact_print(ss)
+    print("uncovered", (agg == 0).astype(int).sum())
+
+create_almost_diagonal_cover_attempt((14, 14)) ; exit()
 
 
 def search_for_diagonal_covers(shape):
-    while True:
-        create_diagonal_cover_attempt(shape)
+    n, m = shape
+    k = 4
+    descending = [(-1, intercept) for intercept in np.arange(k) * 2 + 9 + 0.5]
+    ascending = [(1, intercept) for intercept in np.arange(n - k - 1) * 2 - 6 + 0.5]
+    lines_2par = np.array(descending + ascending)
+
+    def perturb(lines):
+        lines = lines.copy()
+        lines[:, 0] += np.random.normal(scale=0.05, size=1) # len(lines))
+        lines[:, 1] *= 1 + np.random.normal(scale=0.1, size=1)
+        lines[:, 1] += np.random.normal(scale=0.5, size=1) # len(lines))
+        return lines
+
+    for _ in range(10000):
+        lines = tuple((-si[0], 1, -si[1]) for si in perturb(lines_2par))
+
+        agg = np.zeros((n, n))
+        for line in lines:
+            result = slices(line, shape)
+            agg += result
+        # print(agg) ; print("============================")
+        if agg.min() > 0:
+            print("VICTORY", agg)
+            exit()
+
+# search_for_diagonal_covers((12, 12)) ; exit()
 
 
 def visualize_partition(shape, granularity):
@@ -749,27 +834,84 @@ def create_lagrangian(shape, weight):
     return lag
 
 
+# update: this does not work, gives a cca 0.5n lower bound.
+def create_gergo_lagrangian(shape):
+    n, m = shape
+    assert n == m
+    g = mygrid((n-1, m-1)).astype(float) # reusing a code for cells that was created for crossings. (as in chess vs go)
+    x = g[:, :, 0] / (n-1) * 2 - 1
+    y = g[:, :, 1] / (m-1) * 2 - 1
+    l1_dist = np.abs(x) + np.abs(y)
+    diarect = (np.abs(x - y) <= 0.5) & (np.abs(x + y) <= 1.5)
+    diarect = diarect.astype(float)
+    complement = (diarect + diarect[:, ::-1] == 0) & (np.abs(x + y) <= 1.5)
+    complement = complement.astype(float)
+    complement /= 2
+    cross = np.abs(diarect - diarect[:, ::-1])
+    print(cross + complement)
+    return cross + complement
+
+
+def create_daniel_lagrangian(shape, weights):
+    n, m = shape
+    assert n == m
+    g = mygrid((n-1, m-1)) # reusing a code for cells that was created for crossings. (as in chess vs go)
+    x = g[:, :, 0] - (n - 1) // 2
+    y = g[:, :, 1] - (n - 1) // 2
+    linf = np.maximum(np.abs(x), np.abs(y))
+    lag = np.zeros(shape)
+    for i, w in enumerate(weights):
+        lag += (linf == i) * w
+    return lag
+
 def lagrangian_to_lower_bound(lagrangian, set_system):
     dual_covers = lagrangian.flatten().dot(set_system.astype(int))
     # for each slice, the sum of the lagrangian at its elements
     # supposed to be smaller than 1, but here the lagrangian is unnormalized yet.
     worst = max(dual_covers)
+    worst_index = np.argmax(dual_covers)
+    worst_line = set_system[:, worst_index].reshape(shape).astype(int)
+    for row in worst_line:
+        print(row)
+    print("worst", worst, "sum", np.sum(lagrangian))
     dual_covers /= worst
     lb = np.sum(lagrangian) / worst
-    print("lower bound", lb)
+    return lb
 
     # plt.hist(dual_covers, bins=30)
     # plt.show()
 
 
+def bad_line_test():
+    n, m = shape
+    assert n % 3 == 0 and n % 2 == 1
+    k = n // 2 + 1
+    l = int(n / 6 + 1)
+    weights = [0] * l + [1] * (k-l)
+    lagrangian = create_daniel_lagrangian(shape, weights)
+    print(lagrangian_to_lower_bound(lagrangian, ss), weights)
+
+# bad_line_test() ; exit()
+
+
 def tune_mixing_weight():
-    for weight in np.linspace(0, 1, 20):
-        lagrangian = create_lagrangian(shape, weight)
-        print(weight)
-        lagrangian_to_lower_bound(lagrangian, ss)
+    interval = np.linspace(0, 1, 2) ** 2
+    n, m = shape
+    assert n % 2 == 1
+    k = n // 2 + 1
+    weight_vecs = np.array(np.meshgrid(*([interval] * k))).T.reshape(-1, k) # direct product of k intervals
+    weight_vecs = [[0] * l + [1] * (k-l) for l in range(1, k)]
+    print(weight_vecs)
+    print("len(weight_vecs)", len(weight_vecs), file=sys.stderr)
+    for i, weights in enumerate(weight_vecs):
+        lagrangian = create_daniel_lagrangian(shape, weights)
+        print(lagrangian_to_lower_bound(lagrangian, ss), weights)
+        if i % 10000 == 0:
+            print(i, file=sys.stderr)
 
+tune_mixing_weight() ; exit()
 
-print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape, 1) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
+print("evaluating analytical lagrangian") ; analytical_lagrangian = create_gergo_lagrangian(shape) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
 
 # cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
 
