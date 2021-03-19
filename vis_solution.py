@@ -54,7 +54,7 @@ assert n == m
 
 # this is very specific to configurations of n=10 solutions, see ./solutions-batch/10/
 # after normalization, the 2-batch goes WNW-to-ESE (slopes.max() > 1), and the 7-batch goes somewhere near NE-to-SW.
-normalize_slopes = True
+normalize_slopes = False
 if normalize_slopes:
     slopes = lines[:, 0]
     # assert (slopes > 0).sum() in (2, 7)

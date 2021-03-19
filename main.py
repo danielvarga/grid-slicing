@@ -522,7 +522,77 @@ def create_almost_diagonal_cover_attempt(shape):
     compact_print(ss)
     print("uncovered", (agg == 0).astype(int).sum())
 
-create_almost_diagonal_cover_attempt((14, 14)) ; exit()
+# create_almost_diagonal_cover_attempt((14, 14)) ; exit()
+
+
+
+# minimum score across all covered.
+def level(partial_cover, scoring_grid):
+    return np.min(np.where(partial_cover, 1e10, 0) + scoring_grid)
+
+
+def greedy_step_for_almost_diagonal_cover(covered, all_slices, scoring_grid):
+    levels = []
+    for slc in all_slices:
+        lvl = level(covered | slc, scoring_grid)
+        levels.append(lvl)
+    levels = np.array(levels)
+    best_index = np.argmax(levels)
+    slc = all_slices[best_index]
+    return slc.astype(bool)
+
+
+def greedy_search_for_almost_diagonal_cover(shape):
+    n, m = shape
+    assert n == m
+    # two close-to-1 slope lines, close to the diagonal,
+    # and n-1-2 close-to-minus-1 slope lines, arranged somewhat regularly.
+
+    filename = "set-systems/%d-%d.npy" % shape
+    try:
+        f = open(filename, "rb")
+        all_slices = np.load(f)
+        print("took set system from cache %s" % filename)
+    except:
+        print("%s not found" % filename)
+        exit()
+
+
+    A, B, C, D = 0, n, 2*n, 3*n
+    z_pairs = [
+        (B+1.01, D-0.99), (B-0.99, D+1.01),
+    ]
+    z_pairs = np.array(z_pairs)
+    covered = np.zeros((n, n)).astype(bool)
+    solution = []
+    for z1, z2 in z_pairs:
+        line = parametrized_line(shape, z1, z2)
+        result = slices(line, shape)
+        solution.append(result)
+        covered |= result.astype(bool)
+
+    scoring_grid = np.arange(n)[:, np.newaxis] + np.arange(n)[np.newaxis, :]
+    while not np.all(covered):
+        slc = greedy_step_for_almost_diagonal_cover(covered, all_slices, scoring_grid)
+        covered |= slc
+        solution.append(slc)
+        '''
+        print("=====")
+        print(slc.astype(int))
+        print("-----")
+        print(covered.astype(int))
+        '''
+        print(len(solution))
+        sys.stdout.flush()
+    solution = np.array(solution)
+    print(solution.shape)
+    print("found solution of size %d for n=%d" % (len(solution), n))
+    np.save(open("greedy.%d.npy" % n, "wb"), solution)
+
+
+n = int(sys.argv[1])
+greedy_search_for_almost_diagonal_cover((n, n))
+exit()
 
 
 def search_for_diagonal_covers(shape):
