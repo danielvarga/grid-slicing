@@ -85,8 +85,6 @@ print("line equations:")
 # note: lines are not normalized, because they were not mirrored and transposed unlike slopes and ss.
 print(lines)
 
-visualize_solution(ss, output_filename)
-
 subset = [i for i in range(len(slopes)) if slopes[i] > 0]
 
 complement = list(set(range(len(slopes))).difference(subset))
@@ -104,6 +102,20 @@ def compact_print(ss):
         for j in range(m):
             print(pp(grid[i, j].nonzero()[0]), "\t", end='')
         print()
+
+'''
+print("MANUAL TUNING!!!")
+# applied specifically to solutions-batch/14/solution.14.65341.npy
+ss[12] = ss[11, ::-1, ::-1]
+ss[[1,3,5,6,9], :, :] = ss[[0,2,4,7,8], ::-1, ::-1]
+# ss[10] is unchanged, it's already centrally symmetric.
+'''
+
+visualize_solution(ss, output_filename)
+
+print("uncovered", (ss.sum(axis=0) == 0).astype(int).sum())
+print("agg")
+print(ss.sum(axis=0))
 
 ss1 = ss.copy()
 ss1[complement, :, :] = 0
