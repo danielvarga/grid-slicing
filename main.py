@@ -393,6 +393,63 @@ def parametrized_line(shape, z1, z2):
     return a, b, c
 
 
+# a line that's almost diagonal except that it intersects cells (x-1, y) and (x+1, y).
+# https://www.wolframalpha.com/input/?i=solve+a*x%2B%28y-epsilon%29%2Bc%3D0%2C+a*%28x%2B1%29%2B%28y%2B1%2Bepsilon%29%2Bc%3D0+for+a%2Cc
+def line_with_bump(p, upward):
+    x, y = p
+    N = 1000000
+    if upward:
+        a = N + 2
+        b = N
+        c = - x * (N + 2) - N * y - N - 1
+    else:
+        a = - N - 2
+        b = N
+        c = 2 * x + 1 + N * (x - y)
+    return a, b, c
+
+
+def create_general_nontrivial_solution(n):
+    assert n % 2 == 0 # for now, but it works for odd n too.
+    k = n // 2
+    shape = (n, n)
+    line0 = line_with_bump((k - 1, k), upward=False)
+    line1 = line_with_bump((k, k - 1), upward=False)
+
+    # transpose
+    line0 = line0[1], line0[0], line0[2]
+    line1 = line1[1], line1[0], line1[2]
+
+    lines = [line0, line1]
+
+    s0 = slices(line0, shape)
+    s1 = slices(line1, shape)
+    print(s0.astype(int) + s1.astype(int) * 2)
+
+    for i in range(2, k + 1):
+        line = line_with_bump((i, i - 1), upward=True)
+        lines.append(line)
+        s = slices(line, shape)
+        print(s.astype(int))
+
+    print("====")
+    for i in range(k + 1, n - 1):
+        line = line_with_bump((i + 1, i - 2), upward=True)
+        lines.append(line)
+        s = slices(line, shape)
+        print(s.astype(int))
+    print("set system size", len(lines))
+    collected = []
+    for line in lines:
+        s = slices(line, shape)
+        collected.append(s)
+    collected = np.array(collected)
+    print("agg")
+    print(collected.astype(int).sum(axis=0))
+
+
+n = int(sys.argv[1]) ; create_general_nontrivial_solution(n) ; exit()
+
 def pp(l):
     return str(list(l)).replace('[]', '.').replace('[', '').replace(']', '').replace(' ', '')
 
