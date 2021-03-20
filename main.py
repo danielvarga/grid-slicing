@@ -422,30 +422,28 @@ def create_general_nontrivial_solution(n):
 
     lines = [line0, line1]
 
-    s0 = slices(line0, shape)
-    s1 = slices(line1, shape)
-    print(s0.astype(int) + s1.astype(int) * 2)
-
     for i in range(2, k + 1):
         line = line_with_bump((i, i - 1), upward=True)
         lines.append(line)
-        s = slices(line, shape)
-        print(s.astype(int))
 
-    print("====")
     for i in range(k + 1, n - 1):
         line = line_with_bump((i + 1, i - 2), upward=True)
         lines.append(line)
-        s = slices(line, shape)
-        print(s.astype(int))
-    print("set system size", len(lines))
+
+    print("n =", n)
+    print("set system size = ", len(lines))
     collected = []
-    for line in lines:
+    dump = False
+    for i, line in enumerate(lines):
+        print("line", i, ":", *line)
         s = slices(line, shape)
         collected.append(s)
+        if dump:
+            print(s.astype(int))
+            print("-----")
     collected = np.array(collected)
-    print("agg")
-    print(collected.astype(int).sum(axis=0))
+    uncovered = (collected.astype(int).sum(axis=0) == 0).astype(int).sum()
+    print("uncovered cell count = ", uncovered)
 
 
 n = int(sys.argv[1]) ; create_general_nontrivial_solution(n) ; exit()
