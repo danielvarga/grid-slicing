@@ -444,9 +444,12 @@ def create_general_nontrivial_solution(n):
     collected = np.array(collected)
     uncovered = (collected.astype(int).sum(axis=0) == 0).astype(int).sum()
     print("uncovered cell count = ", uncovered)
-
+    filename = "exact-%d.npy" % n
+    np.save(open(filename, "wb"), collected)
+    print("solution saved to", filename)
 
 n = int(sys.argv[1]) ; create_general_nontrivial_solution(n) ; exit()
+
 
 def pp(l):
     return str(list(l)).replace('[]', '.').replace('[', '').replace(']', '').replace(' ', '')
