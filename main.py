@@ -422,12 +422,8 @@ def create_general_nontrivial_solution(n):
 
     lines = [line0, line1]
 
-    for i in range(2, k + 1):
+    for i in range(2, n - 1):
         line = line_with_bump((i, i - 1), upward=True)
-        lines.append(line)
-
-    for i in range(k + 1, n - 1):
-        line = line_with_bump((i + 1, i - 2), upward=True)
         lines.append(line)
 
     print("n =", n)
