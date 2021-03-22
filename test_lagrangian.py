@@ -143,20 +143,49 @@ n = int(sys.argv[1])
 m = n
 shape = n, m
 
-compare_analytical_and_empirical_surfaces(shape) ; exit()
-
-
-cache = "set-systems/%d-%d.npy" % (n, n)
-slices = np.load(open(cache, "rb"))
-print(slices.shape)
+# compare_analytical_and_empirical_surfaces(shape) ; exit()
 
 lag = create_lagrangian(shape)
-ss = slices
-ss = ss.reshape((len(ss), -1)) # flatten the nxm grids to n*m vectors
-ss = ss.T
 
-constraints = lag.flatten().dot(ss)
-worst = constraints.max()
-print(constraints.shape, worst)
-lb = lag.sum() / worst
-print("lb =", lb, ", that's", lb / n, "times n")
+def bound_from_sampling(shape, lag, N):
+    line_bounds = []
+    for _ in range(N):
+        line = parametrized_line(shape, np.random.uniform(4 * n), np.random.uniform(4 * n))
+        a, b, c = line
+        if a == 0 or b == 0:
+            continue
+        result = slices(line, shape).astype(int)
+        line_bounds.append((result * lag).sum())
+    worst = max(line_bounds)
+    lb = lag.sum() / worst
+    print("lb =", lb, ", that's", lb / n, "times n")
+    return lb
+
+
+def bound_from_exact_enumeration(shape, lag):
+    n, m = shape
+    assert n == m
+    cache = "set-systems/%d-%d.npy" % (n, n)
+    slices = np.load(open(cache, "rb"))
+    print(slices.shape)
+
+    ss = slices
+    ss = ss.reshape((len(ss), -1)) # flatten the nxm grids to n*m vectors
+    ss = ss.T
+
+    constraints = lag.flatten().dot(ss)
+    worst = constraints.max()
+    print(constraints.shape, worst)
+    lb = lag.sum() / worst
+    print("lb =", lb, ", that's", lb / n, "times n")
+    return lb
+
+
+print("lower bound for number of lines, based on random sampling of lines")
+print("(so that's really an upper bound for the lower bound, informs but does not prove anything.)")
+lb_sampled = bound_from_sampling(shape, lag, N=10000)
+print("lower bound for number of lines, based on exact enumeration of all lines")
+print("so that's provably correct for this specific n")
+lb_exact = bound_from_exact_enumeration(shape, lag)
+
+
