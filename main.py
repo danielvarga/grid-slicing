@@ -409,6 +409,81 @@ def line_with_bump(p, upward):
     return a, b, c
 
 
+# line through (p,0) and (0,q)
+def crossing_line(p, q):
+    b = p
+    a = q
+    c = - p * q
+    return a, b, c
+
+def optimal_half_cross(n, p, q):
+    shape = n, n
+    agg = np.zeros(shape).astype(int)
+    start_line = crossing_line(p, q)
+    start_agg = slices(start_line, shape).astype(int)
+    agg = start_agg.copy()
+    line = list(start_line)
+    lines = [line]
+    while True:
+        line[2] -= (line[0] + line[1]) # parallel translation by (1, 1)
+        agg += slices(line, shape).astype(int)
+        assert agg.max() == 1
+        agg_mirrored = agg[::-1, ::-1]
+        lines.append(tuple(line))
+        if (agg_mirrored * start_agg).sum() > 0:
+            break
+    return lines, agg
+
+
+def lines_to_mask(shape, lines):
+    agg = np.zeros(shape).astype(int)
+    for line in lines:
+        agg += slices(line, shape)
+    return (agg > 0).astype(int)
+
+
+def line_through_floating_point(p1, p2):
+    x1, y1 = p1
+    x2, y2 = p2
+    a = y2 - y1
+    b = x1 - x2
+    c = (x2 - x1) * y1 - (y2 - y1) * x1
+    return a, b, c
+
+
+def optimal_cross(n, p, q):
+    lines, agg = optimal_half_cross(n, p, q)
+    # print("half cross:") ; print(agg) ; print("now let's finish it")
+    size_phase1 = len(lines)
+    left = np.nonzero(agg[:, 0])[0][0] - 1, 0
+    up = 0, np.nonzero(agg[0, :])[0][0] - 1
+    right = np.nonzero(agg[:, -1])[0][-1] + 1, n - 1
+    down = n - 1, np.nonzero(agg[-1, :])[0][-1] + 1
+    # print(left, up, right, down)
+    epsilon = 1e-6
+    # the line that barely but intersect cells left and down in their top right corner.
+    perpend = line_through_floating_point((left[0] + epsilon, 1 - epsilon), (n - 1 + epsilon, down[1] + 1 - epsilon))
+    agg_phase2 = np.zeros_like(agg)
+    agg_phase1 = agg.copy()
+    while (agg == 0).astype(int).sum() > 0:
+        agg += slices(perpend, shape)
+        agg_phase2 += slices(perpend, shape) * len(lines)
+        lines.append(perpend)
+        a, b, c = perpend
+        perpend = a, b, c + a - b
+    # print(agg_phase2)
+    print(len(lines), "=", size_phase1, "+", len(lines)-size_phase1)
+
+
+n = int(sys.argv[1])
+epsilon = 1e-6
+shape = (n, n)
+for alpha in np.linspace(n // 2 - 10, n // 2 + 10, 100):
+    print(alpha)
+    optimal_cross(n, alpha, n // 2 + 2 * np.random.uniform())
+exit()
+
+
 def create_general_nontrivial_solution(n):
     assert n % 2 == 0 # for now, but it works for odd n too.
     k = n // 2
