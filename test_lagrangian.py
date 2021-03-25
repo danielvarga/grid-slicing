@@ -89,6 +89,7 @@ def vis_quadratic(samples, opposite):
 
 
 def create_lagrangian(shape):
+    n, m = shape
     g = mygrid((n-1, m-1)).astype(float) # reusing a code for cells that was created for crossings. (as in chess vs go)
     x = g[:, :, 0] / (n-1) * 2 - 1
     y = g[:, :, 1] / (m-1) * 2 - 1
@@ -98,6 +99,12 @@ def create_lagrangian(shape):
 
     # fitted polynomial
     lag = x * x + y * y - 2 * x * x * y * y
+    # lag = 0.22662088 + x * x * 1.3398939 + y * y * 1.3376968 - x * x * y * y * 2.3765702
+    # lag = -0.27359456 + 1.2434552 * np.abs(x) + 1.2371192 * np.abs(y) - 1.4349557 * np.abs(x) * np.abs(y)
+
+    # Gergo's formula
+    # lag = np.abs(x) + np.abs(y) - 3 / 2 * np.abs(x) * np.abs(y)
+
     return lag
 
 
