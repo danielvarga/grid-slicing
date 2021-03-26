@@ -452,6 +452,7 @@ def line_through_floating_point(p1, p2):
 
 
 def optimal_cross(n, p, q):
+    shape = n, n
     lines, agg = optimal_half_cross(n, p, q)
     # print("half cross:") ; print(agg) ; print("now let's finish it")
     size_phase1 = len(lines)
@@ -465,23 +466,28 @@ def optimal_cross(n, p, q):
     perpend = line_through_floating_point((left[0] + epsilon, 1 - epsilon), (n - 1 + epsilon, down[1] + 1 - epsilon))
     agg_phase2 = np.zeros_like(agg)
     agg_phase1 = agg.copy()
+    step = 0
     while (agg == 0).astype(int).sum() > 0:
         agg += slices(perpend, shape)
         agg_phase2 += slices(perpend, shape) * len(lines)
         lines.append(perpend)
         a, b, c = perpend
         perpend = a, b, c + a - b
+        step += 1
+        if step > 2 * n:
+            print("terminating infinite loop")
+            return
     # print(agg_phase2)
     print(len(lines), "=", size_phase1, "+", len(lines)-size_phase1)
 
 
-n = int(sys.argv[1])
-epsilon = 1e-6
-shape = (n, n)
-for alpha in np.linspace(n // 2 - 10, n // 2 + 10, 100):
-    print(alpha)
-    optimal_cross(n, alpha, n // 2 + 2 * np.random.uniform())
-exit()
+def list_optimal_crosses(n):
+    epsilon = 1e-6
+    for alpha in np.linspace(n // 2 - 10, n // 2 + 10, 100):
+        print(alpha)
+        optimal_cross(n, alpha, n // 2 + 2 * np.random.uniform())
+
+# n = int(sys.argv[1]) ; list_optimal_crosses(n) ; exit()
 
 
 def create_general_nontrivial_solution(n):
@@ -519,7 +525,7 @@ def create_general_nontrivial_solution(n):
     np.save(open(filename, "wb"), collected)
     print("solution saved to", filename)
 
-n = int(sys.argv[1]) ; create_general_nontrivial_solution(n) ; exit()
+# n = int(sys.argv[1]) ; create_general_nontrivial_solution(n) ; exit()
 
 
 def pp(l):
@@ -654,7 +660,6 @@ def create_almost_diagonal_cover_attempt(shape):
 # create_almost_diagonal_cover_attempt((14, 14)) ; exit()
 
 
-
 # minimum score across all covered.
 def level(partial_cover, scoring_grid):
     return np.min(np.where(partial_cover, 1e10, 0) + scoring_grid)
@@ -719,9 +724,7 @@ def greedy_search_for_almost_diagonal_cover(shape):
     np.save(open("greedy.%d.npy" % n, "wb"), solution)
 
 
-n = int(sys.argv[1])
-greedy_search_for_almost_diagonal_cover((n, n))
-exit()
+# n = int(sys.argv[1]) ; greedy_search_for_almost_diagonal_cover((n, n)) ; exit()
 
 
 def search_for_diagonal_covers(shape):
@@ -782,9 +785,12 @@ def sampling_collect_lines(shape, samples, patience):
     total_attempts = 0
     attempts = 0
     while True:
+        line = random_line(shape)
+        if line[0] == 0.0 or line[1] == 0.0:
+            # these lines are the result of sampling the two endpoints from the same side. they do not help.
+            continue
         total_attempts += 1
         attempts += 1
-        line = random_line(shape)
         result = slices(line, shape)
         if np.sum(result.astype(int)) >= 1:
             result_tup = tuple(map(tuple, result))
@@ -940,8 +946,8 @@ def build_set_system(shape, samples, patience, waist=None):
         print("took set system from cache %s" % filename)
     except OSError:
         # cs = exact_collect_lines(shape)
-        cs = sampling_collect_diagonal_lines(shape, samples=samples)
-        # cs = sampling_collect_lines(shape, samples=samples, patience=patience)
+        # cs = sampling_collect_diagonal_lines(shape, samples=samples)
+        cs = sampling_collect_lines(shape, samples=samples, patience=patience)
         # cs = parametrized_collect_lines(shape, granularity=1000)
         collected_slices = np.array(list(cs))
         np.save(open("%d-%d.npy" % shape, "wb"), collected_slices)
@@ -987,7 +993,7 @@ n = int(sys.argv[1])
 shape = n, n
 
 n, m = shape
-samples = 1000000
+samples = 100000
 patience = 10000
 maxiters = 10000 # unlike the upper bound which needs luck, the lower bound normally converges after maxiters=2.
 
