@@ -525,6 +525,7 @@ def create_general_nontrivial_solution(n):
     np.save(open(filename, "wb"), collected)
     print("solution saved to", filename)
 
+
 # n = int(sys.argv[1]) ; create_general_nontrivial_solution(n) ; exit()
 
 
@@ -1015,25 +1016,57 @@ print(collected_slices.shape, ss.shape, cost.shape)
 
 
 # interpolates between a quadratic polynomial and a rotationally symmetric formula.
-def create_lagrangian(shape, weight):
+def create_lagrangian(shape, weight=None):
     g = mygrid((n-1, m-1)).astype(float) # reusing a code for cells that was created for crossings. (as in chess vs go)
     x = g[:, :, 0] / (n-1) * 2 - 1
     y = g[:, :, 1] / (m-1) * 2 - 1
     dist = np.sqrt(x * x + y * y)
     s2 = 2 ** 0.5
 
+    xa = np.abs(x)
+    ya = np.abs(y)
+
+    # the good old fitted polynomial
+    lag = x * x + y * y - 2 * x * x * y * y
+    lag /= lag.sum()
+    return lag
+
+
+    # fitted a degree 6 poly of abs(x), abs(y)
+    # to an empirical Lagrangian found for (n=100, 40000 sampled lines)
+    # with the nonparametric version of optimize.py.
+    # got 0.7015n when evaluating on the (n=100, 100000 sampled lines) set system.
+    coeffs = np.array([ 4.67821221e-02, 1.54725799e+00, -2.05429441e+01, 1.07163134e+02,
+     -2.34282340e+02, 2.31279650e+02, -8.42997020e+01, 1.54725799e+00,
+     -4.86969904e+01, 5.64970506e+02, -2.46279444e+03, 4.84154366e+03,
+     -4.39738317e+03, 1.50209961e+03, -2.05429441e+01, 5.64970506e+02,
+     -6.57743065e+03, 2.88418628e+04, -5.64993903e+04, 5.08578914e+04,
+     -1.71773480e+04, 1.07163134e+02, -2.46279444e+03, 2.88418628e+04,
+     -1.29274313e+05, 2.57385452e+05, -2.34241721e+05, 7.96864840e+04,
+     -2.34282340e+02, 4.84154366e+03, -5.64993902e+04, 2.57385452e+05,
+     -5.19336442e+05, 4.77142322e+05, -1.63389834e+05, 2.31279650e+02,
+     -4.39738317e+03, 5.08578914e+04, -2.34241721e+05, 4.77142322e+05,
+     -4.41211928e+05, 1.51700150e+05, -8.42997020e+01, 1.50209961e+03,
+     -1.71773480e+04, 7.96864840e+04, -1.63389834e+05, 1.51700150e+05,
+     -5.22615240e+04])
+    print(coeffs.reshape((7, 7)))
+    xy_monom = np.array([xa.flatten() ** i * ya.flatten() ** j for i in range(7) for j in range(7)])
+    lag = xy_monom.T.dot(coeffs).reshape((n, n))
+    return lag
+
+
+    # that's the same approach as the degree 6, just degree 2, gets to 0.6776n.
+    lag = 0.09928857 - 0.24501929 * xa + 1.15962901 * xa*xa - 0.24501929 * ya + 2.06339929 * xa*ya - 1.26814885 * xa*xa*ya + 1.15962901 * ya*ya - 1.26814885 * xa*ya*ya - 1.58775847 * xa*xa*ya*ya
+    return lag
+
+
     # rotationally symmetric formula based on histogram of distance-value scatterplot:
     lag1 = (dist <= 1) * dist + (dist > 1) * (dist - s2) / (1 - s2)
     lag1 /= lag1.sum()
 
-    # fitted polynomial
+    # the good old fitted polynomial
     lag2 = x * x + y * y - 2 * x * x * y * y
     lag2 /= lag2.sum()
-
-    # formula based on histogram of L1-distance - value scatterplot.
-    # worse than the others, currently unused
-    l1_dist = np.abs(x) + np.abs(y)
-    lag3 = (l1_dist <= 1) * l1_dist * l1_dist  + (l1_dist > 1) * (2 - l1_dist)
 
     lag = lag1 * weight + lag2 * (1 - weight)
     return lag
@@ -1069,6 +1102,7 @@ def create_daniel_lagrangian(shape, weights):
         lag += (linf == i) * w
     return lag
 
+
 def lagrangian_to_lower_bound(lagrangian, set_system):
     dual_covers = lagrangian.flatten().dot(set_system.astype(int))
     # for each slice, the sum of the lagrangian at its elements
@@ -1076,8 +1110,10 @@ def lagrangian_to_lower_bound(lagrangian, set_system):
     worst = max(dual_covers)
     worst_index = np.argmax(dual_covers)
     worst_line = set_system[:, worst_index].reshape(shape).astype(int)
+    '''
     for row in worst_line:
         print(row)
+    '''
     print("worst", worst, "sum", np.sum(lagrangian))
     dual_covers /= worst
     lb = np.sum(lagrangian) / worst
@@ -1114,11 +1150,11 @@ def tune_mixing_weight():
         if i % 10000 == 0:
             print(i, file=sys.stderr)
 
-tune_mixing_weight() ; exit()
+# tune_mixing_weight() ; exit()
 
-print("evaluating analytical lagrangian") ; analytical_lagrangian = create_gergo_lagrangian(shape) ; lagrangian_to_lower_bound(analytical_lagrangian, ss)
+print("evaluating analytical lagrangian") ; analytical_lagrangian = create_lagrangian(shape) ; print("lb", lagrangian_to_lower_bound(analytical_lagrangian, ss))
 
-# cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; lagrangian_to_lower_bound(cached_lagrangian, ss)
+# cached_lagrangian = np.load(open("lagrangian.%d-%d.npy" % shape, "rb")) ; print("lb", lagrangian_to_lower_bound(cached_lagrangian, ss))
 
 
 def to_setcoverpy_input(collected_slices):

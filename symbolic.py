@@ -13,6 +13,12 @@ yp = 2 * y - 1
 f = xp * xp + yp * yp - 2 * xp * xp * yp * yp
 # f = 0.22662088 + xp * xp * 1.3398939 + yp * yp * 1.3376968 - xp * xp * yp * yp * 2.3765702
 
+'''
+xa = abs(xp)
+ya = abs(yp)
+f = 0.09928857 - 0.24501929 * xa + 1.15962901 * xa*xa - 0.24501929 * ya + 2.06339929 * xa*ya - 1.26814885 * xa*xa*ya + 1.15962901 * ya*ya - 1.26814885 * xa*ya*ya - 1.58775847 * xa*xa*ya*ya
+# -> this does not work, because sympy cannot simplify the integral of formulae with absolute value functions in them.
+'''
 
 double_integral = integrate(integrate(f, (x, 0, 1)), (y, 0, 1))
 sum_on_grid = double_integral * n ** 2

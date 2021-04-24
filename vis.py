@@ -3,6 +3,12 @@ import numpy as np
 import sys
 
 a = np.load(open(sys.argv[1], "rb"))
+
+print("symmetrizing")
+a = (a + a[:, ::-1]) / 2
+a = (a + a[::-1, :]) / 2
+a = (a + a.T) / 2
+
 plt.imshow(a)
 plt.show()
 
@@ -25,17 +31,26 @@ x = g[:, :, 0] / (n - 1) * 2 - 1
 y = g[:, :, 1] / (m - 1) * 2 - 1
 
 
-X = x.flatten()
-Y = y.flatten()
+X = np.abs(x.flatten())
+Y = np.abs(y.flatten())
 
 # https://stackoverflow.com/a/33966967/383313
 
-P = np.array([X*0+1, X, Y, X**2, X**2*Y, X**2*Y**2, Y**2, X*Y**2, X*Y]).T
+# P = np.array([X*0+1, X, Y, X**2, X**2*Y, X**2*Y**2, Y**2, X*Y**2, X*Y]).T
+
+degree = 6
+
+monomials = []
+for xd in range(degree + 1):
+    for yd in range(degree + 1):
+        monomials.append(X ** xd * Y ** yd)
+P = np.array(monomials).T
+
 Q = a.flatten()
 print(P.shape, Q.shape)
 
 coeff, r, rank, s = np.linalg.lstsq(P, Q)
-print(coeff, rank, s)
+print("coeff", coeff, rank, s)
 
 prediction = P.dot(coeff).reshape((n, m))
 plt.imshow(prediction)
@@ -48,6 +63,7 @@ prediction = P.dot(coeff).reshape((n, m))
 plt.imshow(prediction)
 plt.show()
 
+exit()
 
 dist = np.sqrt(x * x + y * y)
 
