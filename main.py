@@ -65,6 +65,50 @@ def pretty(s):
     return str(s.astype(int)).replace('1', '■').replace('0', '·').replace('[', ' ').replace(']', ' ').replace(' ', '')
 
 
+def parametrized_monotone(shape, jumps):
+    n, m = shape
+    assert len(jumps) == n + 1
+    assert min(jumps) >= 0
+    assert max(jumps) <= m
+    result = np.zeros((n, m), dtype=np.uint8)
+    y_prev = None
+    for x, y in enumerate(jumps): # x addresses a row, y a column!
+        if x > 0:
+            result[x - 1, y_prev : y + 1] = 1
+        y_prev = y
+    return result
+
+n = 5
+shape = n, n
+
+# jumps = [0, 0, 1, 2, 3, 4] ; print(pretty(parametrized_monotone(shape, jumps))) ; exit()
+
+def sample_monotones(shape, sample_count):
+    n, m = shape
+    results = []
+    hashes = set()
+    results = []
+    for i in range(sample_count):
+        jumps = np.sort(np.random.choice(m, n + 1))
+        result = parametrized_monotone(shape, jumps)
+        result_tup = tuple(map(tuple, result))
+        h = hash(result_tup)
+        if h not in hashes:
+            hashes.add(h)
+            results.append(result)
+        if i % 10000 == 0:
+            print(i, len(hashes))
+    '''
+    for result in results:
+        print("====")
+        print(pretty(result))
+    '''
+    results = np.array(results)
+    return results
+
+# sample_monotones(shape, sample_count=100000) ; exit()
+
+
 def slow_slices(line, shape):
     n, m = shape
     a, b, c = line
