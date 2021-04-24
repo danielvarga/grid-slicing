@@ -984,7 +984,7 @@ def create_irregular_waist(shape):
 
 
 def build_set_system(shape, samples, patience, waist=None):
-    filename = "%d-%d.npy" % shape
+    filename = "%d-%d.npy" % shape # I put "%d-%d-mono.npy" % shape here when working with the generalized lines.
     try:
         f = open(filename, "rb")
         collected_slices = np.load(f)
@@ -994,8 +994,12 @@ def build_set_system(shape, samples, patience, waist=None):
         # cs = sampling_collect_diagonal_lines(shape, samples=samples)
         cs = sampling_collect_lines(shape, samples=samples, patience=patience)
         # cs = parametrized_collect_lines(shape, granularity=1000)
+
+        # this is the version with continuous monotone "lines", see vis_monotone.py for a bit more detail.
+        # cs = sample_monotones(shape, sample_count=1000000) ; cs = np.concatenate([cs, cs[:, ::-1]])
+
         collected_slices = np.array(list(cs))
-        np.save(open("%d-%d.npy" % shape, "wb"), collected_slices)
+        np.save(open(filename, "wb"), collected_slices)
 
     if waist is not None:
         collected_slices = list(collected_slices)
