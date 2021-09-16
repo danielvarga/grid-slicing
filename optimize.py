@@ -22,7 +22,7 @@ def main(n):
 
     coeffs = tf.Variable(np.ones(10), dtype=tf.float32)
 
-    parametric = True
+    parametric = False
     if parametric:
         xvar = tf.expand_dims(tf.linspace(-1., 1., n), 0)
         yvar = tf.expand_dims(tf.linspace(-1., 1., n), 1)
@@ -56,19 +56,24 @@ def main(n):
         lag = tf.reshape(lag, [-1])
     else:
         # this is the nonparametric solution:
-        lag = tf.Variable(np.random.uniform(size=n * n), dtype=tf.float32, constraint=constraint)
+        lag = tf.Variable(np.ones(n * n), dtype=tf.float32, constraint=constraint)
 
     target = tf.reduce_max(tf.tensordot(slices, lag, axes=1)) / tf.reduce_sum(tf.nn.relu(lag))
 
-    optimizer = tf.train.AdamOptimizer(learning_rate=0.01)
-    train_step = optimizer.minimize(target)
+    global_step = tf.Variable(0, trainable=False)
+    starter_learning_rate = 0.001
+    learning_rate = tf.compat.v1.train.exponential_decay(starter_learning_rate,
+        global_step, 10000, 0.6, staircase=True)
+
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+    train_step = optimizer.minimize(target, global_step=global_step)
     with tf.Session() as sess:
         init = tf.initialize_all_variables()
         sess.run(init)
 
-        for i in range(3000):
+        for i in range(100000):
             sess.run(train_step)
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 target_val, lag_val = sess.run([target, lag])
                 print(i, 1.0 /  target_val, lag_val.min(), lag_val.max(), lag_val.sum())
         best_lag = sess.run(lag).reshape((n, n))
