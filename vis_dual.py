@@ -2,15 +2,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-a = np.load(open(sys.argv[1], "rb"))
-
+a = np.load(open(sys.argv[1], "rb")).astype(np.float32)
 
 print("symmetrizing")
 a = (a + a[:, ::-1]) / 2
 a = (a + a[::-1, :]) / 2
 
 
-plt.imshow(-a, cmap='gist_gray')
+plt.imshow(a.T) # , cmap='gist_gray')
 plt.show()
 
 print("sum of Lagrangian", a.sum())
@@ -55,14 +54,14 @@ coeff, r, rank, s = np.linalg.lstsq(P, Q)
 print("coeff", coeff, rank, s)
 
 prediction = P.dot(coeff).reshape((n, m))
-plt.imshow(-prediction, cmap='gray')
+plt.imshow(prediction.T) # , cmap='gray')
 plt.show()
 
 
 coeff[np.abs(coeff) < 1e-3] = 0
 print(coeff)
 prediction = P.dot(coeff).reshape((n, m))
-plt.imshow(prediction)
+plt.imshow(prediction.T)
 plt.show()
 
 exit()

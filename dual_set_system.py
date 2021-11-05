@@ -18,17 +18,19 @@ def line(p1, p2):
 
 def random_line(n):
     s = np.zeros((n, n), dtype=np.uint8)
-    p, q = np.random.uniform(low=1/2, high=n - 1/2, size=2) # x_0 y_0 in the paper
+    p, q = np.random.uniform(low=0, high=n, size=2) # x_0 y_0 in the paper
     a, b = line((0, p), (m, q))
     for i in range(m):
         j = a * (i + 0.5) + b
         j = int(np.round(j))
-        s[i, j] = 1
+        if j < n:
+            s[i, j] = 1
     a, b = line((m, q), (n, n-p))
     for i in range(m, n):
         j = a * (i + 0.5) + b
         j = int(np.round(j))
-        s[i, j] = 1
+        if j < n:
+            s[i, j] = 1
     return s
 
 

@@ -13,17 +13,19 @@ def main(n):
     slices_np = np.load(open(cache, "rb"))
     slices_np = slices_np.reshape((-1, n * n))
     print(slices_np.shape)
-    slices = tf.constant(slices_np, dtype=tf.float32)
+    slices = tf.constant(slices_np, dtype=tf.float16)
 
     def constraint(x):
         # x /= tf.reduce_sum(x)
         x = tf.clip_by_value(x, 0., 1.)
         return x
 
-    coeffs = tf.Variable(np.ones(16), dtype=tf.float32)
+    d = 2
+    coeffs = tf.concat([tf.Variable(np.ones(1), dtype=tf.float16), tf.Variable(np.ones((d+1)*(d+1) - 1), dtype=tf.float16)], axis=0)
 
     parametric = False
     if parametric:
+        # this codepath does not yet support float16
         xvar = tf.expand_dims(tf.linspace(-1., 1., n), 0)
         yvar = tf.expand_dims(tf.linspace(-1., 1., n), 1)
 
@@ -36,6 +38,7 @@ def main(n):
         D2 = X2 + Y2
         Dinf = tf.maximum(X1, Y1)
 
+        '''
         c0, c1, c2, c3, c4, c5, c6, c7, c8, c9 = coeffs[0], coeffs[1], coeffs[2], coeffs[3], coeffs[4], coeffs[5], coeffs[6], coeffs[7], coeffs[8], coeffs[9]
 
         V = D1
@@ -49,14 +52,14 @@ def main(n):
         # lag = c0 + c1 * X2 + c1 * Y2 + c3 * X2 * Y2
         # lag = c0 * 0 + X2 + Y2 - 2 * X2 * Y2
 
-
         lag = c0 + c1 * X1 + c2 * Y1 + c3 * X1 * Y1 + c4 * X1 * X1 + c5 * Y1 * Y1 + c6 * X1 * X1 * Y1 + c7 * X1 * Y1 * Y1 + c8 * X1 * X1 * Y1 * Y1
+        '''
 
         Y11 = tf.abs(Y1 - 0.5)
         lag = 0
-        for i in range(4):
-            for j in range(4):
-                lag += coeffs[i * 4 + j] * X1 ** i * Y11 ** j
+        for i in range(d + 1):
+            for j in range(d + 1):
+                lag += coeffs[i * (d+1) + j] * X1 ** i * Y11 ** j
 
         # lag = c0 + c1 * X1 + c2 * Y1
 
@@ -65,12 +68,12 @@ def main(n):
         lag = tf.reshape(lag, [-1])
     else:
         # this is the nonparametric solution:
-        lag = tf.Variable(np.ones(n * n), dtype=tf.float32, constraint=constraint)
+        lag = tf.Variable(np.ones(n * n), dtype=tf.float16, constraint=constraint)
 
-    target = tf.reduce_max(tf.tensordot(slices, lag, axes=1)) / tf.reduce_sum(tf.nn.relu(lag))
+    target = tf.reduce_sum(tf.nn.relu(lag)) / tf.reduce_min(tf.tensordot(slices, lag, axes=1))
 
     global_step = tf.Variable(0, trainable=False)
-    starter_learning_rate = 0.003
+    starter_learning_rate = 0.001
     learning_rate = tf.compat.v1.train.exponential_decay(starter_learning_rate,
         global_step, 10000, 0.6, staircase=True)
 
@@ -82,9 +85,9 @@ def main(n):
 
         for i in range(10000):
             sess.run(train_step)
-            if i % 1000 == 0:
+            if i % 100 == 0:
                 target_val, lag_val = sess.run([target, lag])
-                print(i, 1.0 /  target_val, lag_val.min(), lag_val.max(), lag_val.sum())
+                print(i, target_val, lag_val.min(), lag_val.max(), lag_val.sum())
         best_lag = sess.run(lag).reshape((n, n))
         np.save(open("dual-tensorflow.%d-%d.npy" % shape, "wb"), best_lag)
         best_coeffs = sess.run(coeffs)

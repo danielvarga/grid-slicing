@@ -4,12 +4,14 @@ import sys
 
 a = np.load(open(sys.argv[1], "rb"))
 
+
 print("symmetrizing")
 a = (a + a[:, ::-1]) / 2
 a = (a + a[::-1, :]) / 2
 a = (a + a.T) / 2
 
-plt.imshow(a)
+
+plt.imshow(-a, cmap='gist_gray')
 plt.show()
 
 print("sum of Lagrangian", a.sum())
@@ -38,12 +40,13 @@ Y = np.abs(y.flatten())
 
 # P = np.array([X*0+1, X, Y, X**2, X**2*Y, X**2*Y**2, Y**2, X*Y**2, X*Y]).T
 
-degree = 6
+degree = 5
 
 monomials = []
 for xd in range(degree + 1):
     for yd in range(degree + 1):
-        monomials.append(X ** xd * Y ** yd)
+        monomials.append(np.abs(X) ** xd * np.abs(Y) ** yd)
+        # monomials.append(X ** xd * Y ** yd)
 P = np.array(monomials).T
 
 Q = a.flatten()
@@ -53,7 +56,7 @@ coeff, r, rank, s = np.linalg.lstsq(P, Q)
 print("coeff", coeff, rank, s)
 
 prediction = P.dot(coeff).reshape((n, m))
-plt.imshow(prediction)
+plt.imshow(-prediction, cmap='gray')
 plt.show()
 
 
