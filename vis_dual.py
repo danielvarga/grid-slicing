@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+from scipy.ndimage.filters import gaussian_filter
+
 
 a = np.load(open(sys.argv[1], "rb")).astype(np.float32)
 
@@ -15,6 +17,28 @@ plt.show()
 print("sum of Lagrangian", a.sum())
 
 n, m = a.shape
+
+
+b = a[:n // 4, :n // 2]
+plt.imshow(b.T) # , cmap='gist_gray')
+plt.show()
+
+from mpl_toolkits import mplot3d
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+x = np.linspace(0, 1, n // 2)
+y = np.linspace(0, 0.5, n // 4)
+X, Y = np.meshgrid(x, y)
+
+b_smoothed = gaussian_filter(b, (2, 2), mode='constant')
+
+# ax.plot_surface(X, Y, b, cmap='viridis', edgecolor='none')
+# plt.show()
+
+ax.plot_surface(X, Y, b_smoothed, cmap='viridis', edgecolor='none')
+plt.show()
+exit()
+
 
 def mygrid(shape):
     n, m = shape
@@ -57,8 +81,7 @@ prediction = P.dot(coeff).reshape((n, m))
 plt.imshow(prediction.T) # , cmap='gray')
 plt.show()
 
-
-coeff[np.abs(coeff) < 1e-3] = 0
+coeff[np.abs(coeff) < 10] = 0
 print(coeff)
 prediction = P.dot(coeff).reshape((n, m))
 plt.imshow(prediction.T)

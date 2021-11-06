@@ -2,18 +2,35 @@ import sys
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import pickle
 
 n = int(sys.argv[1])
 m = n
 shape = n, m
 
+do_sparse = True
+
+def llp_to_sparsetensor(llp):
+    indices = []
+    values = []
+    for i in range(len(llp)):
+        for x, y in llp[i]:
+            indices.append((i, x * n + y))
+            values.append(1)
+    return tf.sparse.SparseTensor(np.array(indices, dtype=np.int64), np.array(values, dtype=np.float32), dense_shape=(len(llp), n * n))
+
 
 def main(n):
-    cache = "dual-set-systems/%d-%d.npy" % (n, n)
-    slices_np = np.load(open(cache, "rb"))
-    slices_np = slices_np.reshape((-1, n * n))
-    print(slices_np.shape)
-    slices = tf.constant(slices_np, dtype=tf.float16)
+    if do_sparse:
+        # list of list of pairs
+        cache = pickle.load(open("dual-set-systems/%d-%d.pkl" % (n, n), "rb"))
+        slices = llp_to_sparsetensor(cache)
+    else:
+        cache = "dual-set-systems/%d-%d.npy" % (n, n)
+        slices_np = np.load(open(cache, "rb"))
+        slices_np = slices_np.reshape((-1, n * n))
+        print(slices_np.shape)
+        slices = tf.sparse.from_dense(tf.constant(slices_np, dtype=tf.float32))
 
     def constraint(x):
         # x /= tf.reduce_sum(x)
@@ -21,7 +38,7 @@ def main(n):
         return x
 
     d = 2
-    coeffs = tf.concat([tf.Variable(np.ones(1), dtype=tf.float16), tf.Variable(np.ones((d+1)*(d+1) - 1), dtype=tf.float16)], axis=0)
+    coeffs = tf.concat([tf.Variable(np.ones(1), dtype=tf.float32), tf.Variable(np.ones((d+1)*(d+1) - 1), dtype=tf.float32)], axis=0)
 
     parametric = False
     if parametric:
@@ -68,14 +85,14 @@ def main(n):
         lag = tf.reshape(lag, [-1])
     else:
         # this is the nonparametric solution:
-        lag = tf.Variable(np.ones(n * n), dtype=tf.float16, constraint=constraint)
+        lag = tf.Variable(np.ones(n * n), dtype=tf.float32, constraint=constraint)
 
-    target = tf.reduce_sum(tf.nn.relu(lag)) / tf.reduce_min(tf.tensordot(slices, lag, axes=1))
+    target = tf.reduce_sum(tf.nn.relu(lag)) / tf.reduce_min(tf.sparse_tensor_dense_matmul(slices, tf.reshape(lag, (n*n, 1))))
 
     global_step = tf.Variable(0, trainable=False)
-    starter_learning_rate = 0.001
+    starter_learning_rate = 0.01
     learning_rate = tf.compat.v1.train.exponential_decay(starter_learning_rate,
-        global_step, 10000, 0.6, staircase=True)
+        global_step, 1000, 0.8, staircase=True)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     train_step = optimizer.minimize(target, global_step=global_step)
@@ -83,11 +100,12 @@ def main(n):
         init = tf.initialize_all_variables()
         sess.run(init)
 
-        for i in range(10000):
+        for i in range(50000):
             sess.run(train_step)
             if i % 100 == 0:
                 target_val, lag_val = sess.run([target, lag])
                 print(i, target_val, lag_val.min(), lag_val.max(), lag_val.sum())
+                np.save(open("dual-tensorflow.%d-%d.temp.npy" % shape, "wb"), lag_val.reshape((n, n)))
         best_lag = sess.run(lag).reshape((n, n))
         np.save(open("dual-tensorflow.%d-%d.npy" % shape, "wb"), best_lag)
         best_coeffs = sess.run(coeffs)
