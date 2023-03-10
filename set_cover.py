@@ -80,12 +80,44 @@ a = np.load(sys.argv[1])
 '''
 
 
-def solve(set_system, already_covered):
+def solve_dual(set_system, already_covered):
     set_system_size, n, m = set_system.shape
     assert n == m
     set_system = set_system.reshape((set_system_size, n * n))
     assert already_covered.shape == (n, n)
 
+    with gp.Env(empty=True) as env:
+        # env.setParam('OutputFlag', 0)
+        env.start()
+
+        model = gp.Model("set_cover_dual", env=env)
+
+        y = model.addVars(n * n, lb=0, ub=1, vtype=gp.GRB.CONTINUOUS, name="square")
+
+        # Set objective
+        model.setObjective(gp.quicksum(y), GRB.MAXIMIZE)
+
+        model.addConstrs((gp.quicksum(set_system[j, i] * y[i] for i in range(n * n) if already_covered.flatten()[i] == 0) <= 1 for j in range(set_system_size)))
+
+        # Optimize model
+        model.optimize()
+
+        y_pretty = np.array([v.X for v in model.getVars()]).reshape((n, n))
+        y_pretty *= (1 - already_covered)
+        scs = y_pretty.sum()
+
+        if True:
+            print(y_pretty)
+            print('optimal weight: %g' % scs)
+        return scs
+
+
+
+def solve(set_system, already_covered):
+    set_system_size, n, m = set_system.shape
+    assert n == m
+    set_system = set_system.reshape((set_system_size, n * n))
+    assert already_covered.shape == (n, n)
 
     with gp.Env(empty=True) as env:
         # env.setParam('OutputFlag', 0)
@@ -129,11 +161,15 @@ def try_starters(n):
             # print(f"{i} unfinishable")
 
 
+# try_starters(n) ; exit()
+
+
+already_covered = np.zeros((n, n))
+already_covered[n-2:, 0] = 1 ; already_covered[:2, n-1] = 1
 # already_covered = parametrized_monotone(n, [0]+list(range(n))) ; already_covered = already_covered.T[:, ::-1]
-already_covered = np.zeros((n, n)) ; already_covered[n-2:, 0] = 1 ; already_covered[:2, n-1] = 1
 print(pretty(already_covered))
 pl = low_slope_gentle_monotones(n) # pl as in positive low slope
-cover_size = solve(set_system=pl, already_covered=already_covered)
-print(cover_size, "supposedly", n-2)
+plph = np.concatenate([pl, np.transpose(pl, (0, 2, 1))]) # all positive slope lines
 
-# try_starters(n) ; exit()
+cover_size = solve_dual(set_system=plph, already_covered=already_covered)
+print(cover_size, "supposedly", n-2)
