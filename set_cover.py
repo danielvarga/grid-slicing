@@ -70,16 +70,6 @@ def all_gentle_monotones(n):
     return r
 
 
-n = int(sys.argv[1])
-
-set_system = low_slope_gentle_monotones(n)
-
-
-'''
-a = np.load(sys.argv[1])
-'''
-
-
 def solve_dual(set_system, already_covered):
     set_system_size, n, m = set_system.shape
     assert n == m
@@ -161,15 +151,22 @@ def try_starters(n):
             # print(f"{i} unfinishable")
 
 
-# try_starters(n) ; exit()
+def main():
+    n = int(sys.argv[1])
+
+    already_covered = np.zeros((n, n))
+    already_covered[n-2:, 0] = 1 ; already_covered[:2, n-1] = 1
+    # already_covered = parametrized_monotone(n, [0]+list(range(n))) ; already_covered = already_covered.T[:, ::-1]
+    print(pretty(already_covered))
+    pl = low_slope_gentle_monotones(n) # pl as in positive low slope
+    plph = np.concatenate([pl, np.transpose(pl, (0, 2, 1))]) # all positive slope lines
+
+    cover_size = solve_dual(set_system=plph, already_covered=already_covered)
+    print(cover_size, "supposedly", n-2)
 
 
-already_covered = np.zeros((n, n))
-already_covered[n-2:, 0] = 1 ; already_covered[:2, n-1] = 1
-# already_covered = parametrized_monotone(n, [0]+list(range(n))) ; already_covered = already_covered.T[:, ::-1]
-print(pretty(already_covered))
-pl = low_slope_gentle_monotones(n) # pl as in positive low slope
-plph = np.concatenate([pl, np.transpose(pl, (0, 2, 1))]) # all positive slope lines
 
-cover_size = solve_dual(set_system=plph, already_covered=already_covered)
-print(cover_size, "supposedly", n-2)
+
+if __name__ == "__main__":
+    main() ; exit()
+    # try_starters(n) ; exit()
