@@ -6,7 +6,6 @@ import gurobipy as gp
 from gurobipy import GRB
 
 
-
 def pretty(s):
     return str(s.astype(int)).replace('1', '■').replace('0', '·').replace('[', ' ').replace(']', ' ').replace(' ', '')
 
@@ -60,6 +59,12 @@ def all_gentle_monotones(n):
     r = np.concatenate([r, r[:, :, ::-1]])
     r = np.concatenate([r, r[:, ::-1, :]]) # this is not really needed
     r = np.concatenate([r, np.transpose(r, (0, 2, 1))])
+
+    # this doubling is apparently enough, no quadrupling is needed, but
+    # all the other ways of doubling (mirror vertically, mirror horizontally, transpose) are not enough
+    # to get an n-1 sized cover.
+    # r = np.concatenate([r, np.transpose(r[:, :, ::-1], (0, 2, 1))])
+
     r = np.unique(r, axis=0)
     print("all", r.shape)
     return r
@@ -67,41 +72,68 @@ def all_gentle_monotones(n):
 
 n = int(sys.argv[1])
 
-set_system = all_gentle_monotones(n)
+set_system = low_slope_gentle_monotones(n)
 
 
 '''
 a = np.load(sys.argv[1])
 '''
-set_system_size, n, m = set_system.shape
-assert n == m
-set_system = set_system.reshape((set_system_size, n * n))
 
-try:
-    m = gp.Model("set_cover")
 
-    x = m.addVars(len(set_system), vtype=GRB.BINARY, name="is_in")
+def solve(set_system, already_covered):
+    set_system_size, n, m = set_system.shape
+    assert n == m
+    set_system = set_system.reshape((set_system_size, n * n))
+    assert already_covered.shape == (n, n)
 
-    # Set objective
-    m.setObjective(gp.quicksum(x), GRB.MINIMIZE)
 
-    m.addConstrs((gp.quicksum(set_system[j, i] * x[j] for j in range(set_system_size)) >= 1 for i in range(n * n)))
+    with gp.Env(empty=True) as env:
+        # env.setParam('OutputFlag', 0)
+        env.start()
 
-    # Optimize model
-    m.optimize()
+        model = gp.Model("set_cover", env=env)
 
-    '''
-    for v in m.getVars():
-        print('%s %g' % (v.VarName, v.X))
-    '''
+        x = model.addVars(len(set_system), vtype=GRB.BINARY, name="is_in")
 
-    scs = m.ObjVal
-    print('optimal set cover size: %g' % scs)
-    if scs < n - 1:
-        print("SURPRISE!!!")
+        # Set objective
+        model.setObjective(gp.quicksum(x), GRB.MINIMIZE)
 
-except gp.GurobiError as e:
-    print('Error code ' + str(e.errno) + ': ' + str(e))
+        model.addConstrs((gp.quicksum(set_system[j, i] * x[j] for j in range(set_system_size)) >= 1 for i in range(n * n) if already_covered.flatten()[i] == 0))
 
-except AttributeError:
-    print('Encountered an attribute error')
+        # Optimize model
+        model.optimize()
+
+        if True:
+            for i, v in enumerate(model.getVars()):
+                if v.X == 1:
+                    print("====")
+                    print(pretty(set_system[i].reshape((n, n))))
+
+            scs = model.ObjVal
+            print('optimal set cover size: %g' % scs)
+        return model.ObjVal
+
+
+def try_starters(n):
+    pl = low_slope_gentle_monotones(n) # pl as in positive low slope
+    nh = np.transpose(pl[:, :, ::-1], (0, 2, 1)) # nh as in negative high slope
+
+
+    for i, already_covered in enumerate(nh):
+        cover_size = solve(set_system=pl, already_covered=already_covered)
+        if cover_size == n - 2:
+            print(f"{i} can be finished to an optimal solution")
+            print(pretty(already_covered))
+        else:
+            assert cover_size == n - 1
+            # print(f"{i} unfinishable")
+
+
+# already_covered = parametrized_monotone(n, [0]+list(range(n))) ; already_covered = already_covered.T[:, ::-1]
+already_covered = np.zeros((n, n)) ; already_covered[n-2:, 0] = 1 ; already_covered[:2, n-1] = 1
+print(pretty(already_covered))
+pl = low_slope_gentle_monotones(n) # pl as in positive low slope
+cover_size = solve(set_system=pl, already_covered=already_covered)
+print(cover_size, "supposedly", n-2)
+
+# try_starters(n) ; exit()
