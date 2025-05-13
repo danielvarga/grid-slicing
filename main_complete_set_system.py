@@ -1,3 +1,15 @@
+
+# 1. connects all pairs of grid points.
+# 2. collects all the points where the one of the above lines intersects left side of the board.
+# 3. takes representative (midpoint) of each of the resulting intervals.
+# 4. for each such representative r, take collect_star(r), a set of digital lines.
+# 5. take union of these.
+# 6. add vertical digital lines, cause they are still missing at the moment.
+
+# collect_star(r): emit rays from r toward each grid point.
+#   collect directions. take midpoint d of each interval of directions (circular arc).
+#   for line across d and direction d, collect the digital line.
+
 import numpy as np
 import cvxpy as cp
 from fractions import Fraction
